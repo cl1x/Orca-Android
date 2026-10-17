@@ -76,6 +76,9 @@ fun PickerDialog(title: String, selected: String?, items: List<PickerItem>, onDi
     val filtered = remember(query, items) {
         val words = query.trim().lowercase().split(' ').filter { it.isNotEmpty() }
         items.filter { item -> words.all { w -> item.label.lowercase().contains(w) || item.group.lowercase().contains(w) } }
+            // One heading per group, even when the source list interleaves groups (kept in first-seen order).
+            .groupBy { it.group }.values.flatten()
+            .distinctBy { it.group to it.id }
     }
     AlertDialog(
         onDismissRequest = onDismiss,

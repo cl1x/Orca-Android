@@ -299,17 +299,17 @@ private fun EditorFrame(
                     }
                 }
                 LazyColumn(Modifier.weight(1f).fillMaxHeight().padding(horizontal = 12.dp)) {
-                    groups.forEach { group ->
+                    groups.forEachIndexed { gi, group ->
                         val options = group.options.mapNotNull { defs[it] }.filter {
                             (query.isNotBlank() || onlyModified || visible(it)) && it.key !in hidden && source.value(it.key) != null
                         }
-                        if (options.isEmpty()) return@forEach
-                        item(key = "g:${group.title}") {
+                        if (options.isEmpty()) return@forEachIndexed
+                        item(key = "g:$gi:${group.title}") {
                             Text(if (showPages) tr.tr(group.title) else group.title, style = MaterialTheme.typography.titleSmall,
                                 color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 16.dp, bottom = 4.dp))
                             HorizontalDivider()
                         }
-                        items(options, key = { "o:${group.title}:${it.key}" }) { def ->
+                        items(options, key = { "o:$gi:${it.key}" }) { def ->
                             OptionRow(def, source.value(def.key).orEmpty(), source.isModified(def.key), def.key !in state.optionStates.disabled,
                                 wide, tr, { source.set(def.key, it) }, { source.reset(def.key) })
                         }
