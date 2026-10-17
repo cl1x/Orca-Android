@@ -135,6 +135,9 @@ These are not stored in presets; the desktop's GUI supplies them, so a port has 
 - **Printer web UIs keep working in the background.** Mainsail and Fluidd hold a websocket with
   live temperatures; even a paused WebView keeps processing it. The device tab unloads the page
   when the app is stopped and loads it again on return.
+- **A WebView in Compose needs `MATCH_PARENT` layout params.** `AndroidView` creates it with
+  `WRAP_CONTENT`, and then WebView computes CSS viewport units (`100vh`) as 0. Fluidd limits its
+  camera image to `calc(100vh - 88px)`, so the camera stayed invisible although the stream loaded.
 - **Objects carry `extruder` in their config.** The filament assignment is stored like a setting
   override (`ModelObject::config`), so counting an object's "changed settings" has to leave it out,
   as the desktop's object list does.

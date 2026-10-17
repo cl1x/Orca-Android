@@ -182,6 +182,19 @@ private fun WebUi(connection: PrinterConnection, modifier: Modifier) {
             AndroidView(
                 factory = { ctx ->
                     WebView(ctx).apply {
+                        // With the default WRAP_CONTENT height, WebView computes CSS viewport units (vh) as 0;
+                        // Fluidd sizes its camera image with them, so the camera stayed invisible.
+                        layoutParams = android.view.ViewGroup.LayoutParams(android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.MATCH_PARENT)
+                        // Debug builds: inspectable via chrome://inspect, console in logcat.
+                        if (ctx.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0) {
+                            WebView.setWebContentsDebuggingEnabled(true)
+                            webChromeClient = object : android.webkit.WebChromeClient() {
+                                override fun onConsoleMessage(m: android.webkit.ConsoleMessage): Boolean {
+                                    android.util.Log.i("OrcaWeb", "${m.messageLevel()} ${m.message()} (${m.sourceId()}:${m.lineNumber()})")
+                                    return true
+                                }
+                            }
+                        }
                         settings.javaScriptEnabled = true
                         settings.domStorageEnabled = true
                         settings.mediaPlaybackRequiresUserGesture = false

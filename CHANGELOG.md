@@ -3,6 +3,11 @@
 > Orca-Android was developed with an AI coding assistant (Claude, Anthropic); see the
 > [AI disclosure](README.md#ai-disclosure) in the README.
 
+## 0.1.5
+
+- The camera in the printer's web UI (Fluidd, Mainsail) works: the web view computed the CSS
+  viewport height as 0, so the camera image – and Fluidd's navigation bar – had no height.
+
 ## 0.1.4
 
 - Fixed a crash when opening the filament list for printers whose filaments come from both the
