@@ -3,6 +3,14 @@
 > Orca-Android was developed with an AI coding assistant (Claude, Anthropic); see the
 > [AI disclosure](README.md#ai-disclosure) in the README.
 
+## 0.1.3
+
+- Much lower battery use: the 3D view only draws when something changes (it used to redraw at the
+  display's refresh rate all the time), the printer status is only polled while the app is
+  visible, and the printer's web UI is unloaded in the background and reloaded on return.
+- The progress notification of a running print checks the printer every 15 seconds instead of
+  every 5.
+
 ## 0.1.2
 
 - Profile updates download only the files that changed (seconds instead of minutes) and run in

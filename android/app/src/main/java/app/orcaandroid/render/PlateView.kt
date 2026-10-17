@@ -68,12 +68,17 @@ class PlateView(context: Context) : GLSurfaceView(context) {
         setEGLConfigChooser(8, 8, 8, 8, 24, 4)
         preserveEGLContextOnPause = true
         setRenderer(renderer)
-        renderMode = RENDERMODE_CONTINUOUSLY
+        // Draw only when something changed (touch, camera, new data): continuous rendering keeps the
+        // GPU busy at the display's refresh rate and drains the battery.
+        renderMode = RENDERMODE_WHEN_DIRTY
         isFocusable = true
     }
 
-    /** Runs [block] on the GL thread. */
-    fun onGl(block: PlateRenderer.() -> Unit) = queueEvent { renderer.block() }
+    /** Runs [block] on the GL thread and redraws. */
+    fun onGl(block: PlateRenderer.() -> Unit) {
+        queueEvent { renderer.block() }
+        requestRender()
+    }
 
     @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(event: MotionEvent): Boolean {
@@ -142,6 +147,7 @@ class PlateView(context: Context) : GLSurfaceView(context) {
             }
             MotionEvent.ACTION_CANCEL -> cancelDrag()
         }
+        requestRender()
         return true
     }
 
@@ -149,6 +155,7 @@ class PlateView(context: Context) : GLSurfaceView(context) {
         if (event.action == MotionEvent.ACTION_SCROLL) {
             val v = event.getAxisValue(MotionEvent.AXIS_VSCROLL)
             camera.zoom(if (v > 0) 1.15f else 1f / 1.15f)
+            requestRender()
             return true
         }
         return super.onGenericMotionEvent(event)

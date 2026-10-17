@@ -37,7 +37,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -50,6 +49,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.compose.LifecycleStartEffect
 import app.orcaandroid.R
 import app.orcaandroid.net.HostType
 import app.orcaandroid.net.PrintHost
@@ -73,11 +73,16 @@ fun DeviceScreen(state: UiState, vm: AppViewModel) {
     if (connection == null || !connection.isConfigured) {
         NotConnected(state, vm) { editing = true }
     } else {
-        LaunchedEffect(connection) {
-            while (true) {
-                vm.device.refreshStatus()
-                delay(5000)
+        // Poll the status only while the app is visible.
+        val scope = rememberCoroutineScope()
+        LifecycleStartEffect(connection) {
+            val job = scope.launch {
+                while (true) {
+                    vm.device.refreshStatus()
+                    delay(STATUS_POLL_MS)
+                }
             }
+            onStopOrDispose { job.cancel() }
         }
         // A slim bar above the web UI, so Mainsail/Fluidd keep the full width.
         Column(Modifier.fillMaxSize()) {
@@ -206,6 +211,17 @@ private fun WebUi(connection: PrinterConnection, modifier: Modifier) {
         }
     }
     DisposableEffect(Unit) { onDispose { web?.destroy() } }
+    // Mainsail/Fluidd keep a websocket with live data open, which costs battery even when paused;
+    // unload the page while the app is not visible and load it again on return.
+    LifecycleStartEffect(web) {
+        val w = web
+        if (w != null && w.url == BLANK) w.loadUrl(url)
+        w?.onResume(); w?.resumeTimers()
+        onStopOrDispose {
+            w?.onPause(); w?.pauseTimers()
+            w?.loadUrl(BLANK)
+        }
+    }
 }
 
 @Composable
@@ -284,3 +300,6 @@ private fun ConnectionDialog(state: UiState, vm: AppViewModel, onDismiss: () -> 
         },
     )
 }
+
+private const val STATUS_POLL_MS = 5_000L
+private const val BLANK = "about:blank"

@@ -129,6 +129,12 @@ These are not stored in presets; the desktop's GUI supplies them, so a port has 
   commits its value on focus loss must remember whether it ever had the focus – otherwise every
   number field writes its rounded display value back when it appears, which here changed the scene
   and threw away every slice result.
+- **`GLSurfaceView` must not render continuously.** `RENDERMODE_CONTINUOUSLY` redraws at the
+  display's refresh rate even when nothing moves and drained a phone battery in hours; the view
+  renders on demand (`requestRender()` after touches and every change pushed to the GL thread).
+- **Printer web UIs keep working in the background.** Mainsail and Fluidd hold a websocket with
+  live temperatures; even a paused WebView keeps processing it. The device tab unloads the page
+  when the app is stopped and loads it again on return.
 - **Objects carry `extruder` in their config.** The filament assignment is stored like a setting
   override (`ModelObject::config`), so counting an object's "changed settings" has to leave it out,
   as the desktop's object list does.

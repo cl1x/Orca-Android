@@ -125,7 +125,7 @@ class PrintMonitorService : Service() {
     companion object {
         private const val NOTIFICATION_ID = 2
         private const val DONE_ID = 3
-        private const val POLL_MS = 5_000L
+        private const val POLL_MS = 15_000L
         private const val EXTRA_PRINTER = "printer"
         private const val ACTION_PAUSE = "pause"
         private const val ACTION_RESUME = "resume"
