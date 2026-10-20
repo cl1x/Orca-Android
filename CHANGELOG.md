@@ -3,6 +3,13 @@
 > Orca-Android was developed with an AI coding assistant (Claude, Anthropic); see the
 > [AI disclosure](README.md#ai-disclosure) in the README.
 
+## 0.1.7
+
+- Favourites are grouped like the settings (e.g. "Supports", "Seam"), in the settings' order.
+- A star on each settings group adds all of its options to the favourites at once.
+- In the print panel, favourites that do not apply to the current values are hidden, so dependent
+  options (e.g. support type and style) appear once their parent option is switched on.
+
 ## 0.1.6
 
 - Opening a project whose printer, process, filaments or setting changes differ from the current

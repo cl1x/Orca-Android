@@ -51,6 +51,8 @@ import androidx.compose.ui.unit.dp
 import app.orcaandroid.R
 import app.orcaandroid.core.LayerRange
 import app.orcaandroid.ui.settings.OptionRow
+import app.orcaandroid.ui.settings.favoriteGroups
+import app.orcaandroid.ui.settings.buildPages
 import app.orcaandroid.ui.settings.EnumEditor
 import app.orcaandroid.core.OptionDef
 import app.orcaandroid.core.overrides
@@ -136,65 +138,84 @@ private fun PresetsTab(state: UiState, vm: AppViewModel) {
     QuickSettings(state, vm)
 }
 
-/** The favourite options (starred in the settings editor), one tap away. */
+/**
+ * The favourite options (starred in the settings editor), one tap away, grouped like the settings.
+ * Options the desktop rules grey out for the current values are left out here, so dependent
+ * settings (e.g. the support type) appear once their parent option is switched on.
+ */
 @Composable
 private fun QuickSettings(state: UiState, vm: AppViewModel) {
     val tr = vm.translator
-    val favorites = state.favorites.mapNotNull { id ->
-        PresetType.entries.firstOrNull { it.id == id.substringBefore(':') }?.let { it to id.substringAfter(':') }
-    }
-    val types = favorites.map { it.first }.toSet()
-    var defs by remember { mutableStateOf<Map<String, OptionDef>>(emptyMap()) }
+    val types = PresetType.entries.filter { t -> state.favorites.any { it.startsWith("${t.id}:") } }
+    var defs by remember { mutableStateOf<Map<PresetType, Map<String, OptionDef>>>(emptyMap()) }
     LaunchedEffect(types) {
-        defs = types.flatMap { t -> runCatching { vm.presets.optionDefs(t) }.getOrDefault(emptyList()).map { "${t.id}:${it.key}" to it } }.toMap()
+        defs = types.associateWith { t -> runCatching { vm.presets.optionDefs(t) }.getOrDefault(emptyList()).associateBy { it.key } }
+    }
+    val groups = remember(defs, state.favorites) {
+        types.flatMap { t ->
+            val d = defs[t] ?: return@flatMap emptyList()
+            favoriteGroups(state.favorites, t, buildPages(vm.presets.settingsLayout(t), d), tr).map { g -> Triple(t, g, d) }
+        }
     }
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(stringResource(R.string.favorites), Modifier.weight(1f), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
         TextButton(onClick = { vm.presets.openEditor(EditorTarget.Preset(PresetType.PRINT)) }) { Text(stringResource(R.string.edit_favorites)) }
     }
-    if (favorites.isEmpty()) {
+    if (state.favorites.isEmpty()) {
         Text(stringResource(R.string.favorites_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         return
     }
-    class Fav(val type: PresetType, val def: OptionDef, val value: String) {
-        val enabled get() = type != PresetType.PRINT || def.key !in state.optionStates.disabled
-        val single get() = !def.isVector || !value.contains(',')
-        val numeric get() = single && def.enumValues.isEmpty() && def.baseType in setOf("int", "float", "percent") && value.removeSuffix("%").toFloatOrNull() != null
-        fun set(v: String) = vm.presets.setOption(type, def.key, v)
-    }
-    val items = favorites.mapNotNull { (t, k) -> defs["${t.id}:$k"]?.let { d -> state.value(t, k)?.let { Fav(t, d, it) } } }
-        .filter { it.type != PresetType.PRINT || it.def.key !in state.optionStates.hidden }
     fun label(d: OptionDef) = tr.tr(d.label.ifEmpty { d.fullLabel.ifEmpty { d.key } })
+    val typeName = mapOf(PresetType.FILAMENT to stringResource(R.string.filament), PresetType.PRINTER to stringResource(R.string.printer))
 
-    // Numbers compact, three per row; switches, choices and everything else below.
-    items.filter { it.numeric }.chunked(3).forEach { row ->
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            row.forEach { f ->
-                val d = f.def
-                val decimals = if (d.baseType == "float") 3 else if (d.baseType == "percent") 1 else 0
-                val suffix = if (d.baseType == "percent") "%" else tr.tr(d.sidetext).takeIf { it.isNotEmpty() && !it.startsWith("%") }
-                NumberField(f.value.removeSuffix("%").toFloat(), { v ->
-                    f.set(when (d.baseType) {
-                        "int" -> v.toInt().toString()
-                        "percent" -> plain(v) + "%"
-                        else -> plain(v)
-                    })
-                }, Modifier.weight(1f), label(d), suffix, decimals)
+    for ((type, group, typeDefs) in groups) {
+        val items = group.options.mapNotNull { k -> typeDefs[k]?.let { d -> state.value(type, k)?.let { QuickOption(type, d, it) } } }
+            .filter { type != PresetType.PRINT || (it.def.key !in state.optionStates.hidden && it.def.key !in state.optionStates.disabled) }
+        if (items.isEmpty()) continue
+        val title = group.title.substringAfterLast(" › ")
+        Text(typeName[type]?.let { "$it · $title" } ?: title, style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
+        // In the settings' order; consecutive numbers share a row (up to three), so a switch stays
+        // above the options that depend on it.
+        val rows = mutableListOf<List<QuickOption>>()
+        for (f in items) {
+            val last = rows.lastOrNull()
+            if (f.numeric && last != null && last.all { it.numeric } && last.size < 3) rows[rows.lastIndex] = last + f else rows += listOf(f)
+        }
+        rows.forEach { row ->
+            val f = row.first()
+            val d = f.def
+            when {
+                f.numeric -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    row.forEach { n ->
+                        val nd = n.def
+                        val decimals = if (nd.baseType == "float") 3 else if (nd.baseType == "percent") 1 else 0
+                        val suffix = if (nd.baseType == "percent") "%" else tr.tr(nd.sidetext).takeIf { it.isNotEmpty() && !it.startsWith("%") }
+                        NumberField(n.value.removeSuffix("%").toFloat(), { v ->
+                            vm.presets.setOption(n.type, nd.key, when (nd.baseType) {
+                                "int" -> v.toInt().toString()
+                                "percent" -> plain(v) + "%"
+                                else -> plain(v)
+                            })
+                        }, Modifier.weight(1f), label(nd), suffix, decimals)
+                    }
+                    repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
+                }
+                d.baseType == "bool" && f.single -> SwitchRow(label(d), f.value == "1") { vm.presets.setOption(f.type, d.key, if (it) "1" else "0") }
+                d.enumValues.isNotEmpty() && f.single -> Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(label(d), Modifier.weight(1f).padding(end = 8.dp), style = MaterialTheme.typography.bodyMedium)
+                    Box(Modifier.weight(1f)) { EnumEditor(d, f.value, true, tr) { vm.presets.setOption(f.type, d.key, it) } }
+                }
+                else -> OptionRow(d, f.value, state.isModified(f.type, d.key), true, false, tr, { vm.presets.setOption(f.type, d.key, it) }, { vm.presets.resetOption(f.type, d.key) })
             }
-            repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
         }
     }
-    items.filterNot { it.numeric }.forEach { f ->
-        val d = f.def
-        when {
-            d.baseType == "bool" && f.single -> SwitchRow(label(d), f.value == "1", f.enabled) { f.set(if (it) "1" else "0") }
-            d.enumValues.isNotEmpty() && f.single -> Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(label(d), Modifier.weight(1f).padding(end = 8.dp), style = MaterialTheme.typography.bodyMedium)
-                Box(Modifier.weight(1f)) { EnumEditor(d, f.value, f.enabled, tr) { f.set(it) } }
-            }
-            else -> OptionRow(d, f.value, state.isModified(f.type, d.key), f.enabled, false, tr, { f.set(it) }, { vm.presets.resetOption(f.type, d.key) })
-        }
-    }
+}
+
+/** A favourite shown in the print panel, with its current value. */
+private class QuickOption(val type: PresetType, val def: OptionDef, val value: String) {
+    val single get() = !def.isVector || !value.contains(',')
+    val numeric get() = single && def.enumValues.isEmpty() && def.baseType in setOf("int", "float", "percent") && value.removeSuffix("%").toFloatOrNull() != null
 }
 
 /** A number without trailing zeros, as the settings store it ("0.12", "15"). */

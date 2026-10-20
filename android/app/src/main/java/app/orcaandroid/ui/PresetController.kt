@@ -48,6 +48,15 @@ class PresetController(private val store: Store, private val device: DeviceContr
         store.update { it.copy(favorites = list) }
     }
 
+    /** Stars all [keys] of a settings group, or unstars them if they all are favourites already. */
+    fun toggleFavoriteGroup(type: PresetType, keys: List<String>) {
+        val ids = keys.map { "${type.id}:$it" }
+        val current = store.value.favorites
+        val list = if (ids.all { it in current }) current - ids.toSet() else current + ids.filterNot { it in current }
+        settings.favoriteOptions = list
+        store.update { it.copy(favorites = list) }
+    }
+
     fun setHiddenFilamentVendors(vendors: Set<String>) {
         settings.hiddenFilamentVendors = vendors
         store.update { it.copy(hiddenFilamentVendors = vendors) }

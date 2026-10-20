@@ -260,10 +260,10 @@ private fun EditorFrame(
             HorizontalDivider()
 
             // Starred options of this preset type form a first page, independent of the mode.
-            val favKeys = state.favorites.filter { it.startsWith("${type.id}:") }.map { it.substringAfter(':') }.filter { it in defs }
+            val favGroups = remember(pages, state.favorites) { favoriteGroups(state.favorites, type, pages, tr) }
             val favTitle = stringResource(R.string.favorites)
-            val shownPages = if (favKeys.isEmpty()) pages else listOf(SettingsPage(favTitle, listOf(SettingsGroup("", favKeys)))) + pages
-            val onFavPage = favKeys.isNotEmpty() && pageIndex == 0
+            val shownPages = if (favGroups.isEmpty()) pages else listOf(SettingsPage(favTitle, favGroups)) + pages
+            val onFavPage = favGroups.isNotEmpty() && pageIndex == 0
             fun visible(def: OptionDef) = onFavPage || def.mode <= mode || (mode == 2 && def.mode == 3)
             val hidden = state.optionStates.hidden
             val groups: List<SettingsGroup> = when {
@@ -318,7 +318,8 @@ private fun EditorFrame(
                         if (options.isEmpty()) return@forEachIndexed
                         // Search hits and the "only changed" list are shown open, or they would be hidden.
                         val groupId = "$pageIndex:${group.title}"
-                        val open = group.title.isEmpty() || !showPages || expanded[groupId] == true
+                        // Favourite groups start open, the settings pages' groups collapsed.
+                        val open = group.title.isEmpty() || !showPages || (expanded[groupId] ?: onFavPage)
                         if (group.title.isNotEmpty()) item(key = "g:$gi:${group.title}") {
                             Row(
                                 Modifier.fillMaxWidth().clickable(enabled = showPages) { expanded[groupId] = !open }.padding(top = 12.dp, bottom = 4.dp),
@@ -329,6 +330,16 @@ private fun EditorFrame(
                                 val changed = options.count { source.isModified(it.key) }
                                 if (changed > 0 && !open) Text(stringResource(R.string.n_modified, changed), style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.tertiary, modifier = Modifier.padding(end = 8.dp))
+                                // Star the whole group (as shown in the current mode), or unstar it if all are favourites.
+                                if (showPages) {
+                                    val keys = options.map { it.key }
+                                    val all = keys.all { "${type.id}:$it" in state.favorites }
+                                    IconButton(onClick = { vm.presets.toggleFavoriteGroup(type, keys) }) {
+                                        Icon(if (all) Icons.Default.Star else Icons.Default.StarBorder,
+                                            stringResource(if (all) R.string.remove_group_favorites else R.string.add_group_favorites),
+                                            tint = if (all) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.outline)
+                                    }
+                                }
                                 if (showPages) Icon(if (open) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                                     stringResource(if (open) R.string.collapse else R.string.expand), tint = MaterialTheme.colorScheme.primary)
                             }
@@ -347,8 +358,24 @@ private fun EditorFrame(
     }
 }
 
+/**
+ * The favourite options of [type], grouped like the settings pages ("Quality › Seam"), in the
+ * pages' order. Favourites that no page places are left out.
+ */
+internal fun favoriteGroups(favorites: List<String>, type: PresetType, pages: List<SettingsPage>, tr: Translator): List<SettingsGroup> {
+    val keys = favorites.filter { it.startsWith("${type.id}:") }.map { it.substringAfter(':') }.toSet()
+    if (keys.isEmpty()) return emptyList()
+    val placed = mutableSetOf<String>()
+    return pages.flatMap { page ->
+        page.groups.mapNotNull { g ->
+            val hits = g.options.filter { it in keys && placed.add(it) }
+            if (hits.isEmpty()) null else SettingsGroup("${tr.tr(page.title)} › ${tr.tr(g.title)}", hits)
+        }
+    }
+}
+
 /** Desktop layout plus a trailing page for options the layout does not place. */
-private fun buildPages(layout: List<SettingsPage>, defs: Map<String, OptionDef>): List<SettingsPage> {
+internal fun buildPages(layout: List<SettingsPage>, defs: Map<String, OptionDef>): List<SettingsPage> {
     val placed = layout.flatMap { p -> p.groups.flatMap { it.options } }.toSet()
     val rest = defs.values.filter { it.key !in placed && !it.readonly }
     val extra = rest.groupBy { it.category.ifEmpty { "Others" } }.toSortedMap()
