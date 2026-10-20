@@ -135,6 +135,9 @@ fun Viewport(state: UiState, vm: AppViewModel, onView: (PlateView) -> Unit, modi
         v.onGl { selectedObject = sel?.obj ?: -1 }
         v.selectedBounds = sel?.let { s -> scene.objects.getOrNull(s.obj)?.instances?.map { it.min to (it.min + it.size) } }.orEmpty()
     }
+    // In the preview the view is for looking only: a touch on an object must not move it (which
+    // would discard the slice result) or change the selection.
+    LaunchedEffect(v, showPreview) { v.viewOnly = showPreview }
     LaunchedEffect(v, state.tool) {
         v.mode = when (state.tool) {
             is Tool.Paint -> InteractionMode.PAINT

@@ -37,6 +37,8 @@ class PlateView(context: Context) : GLSurfaceView(context) {
     var mode = InteractionMode.NAVIGATE
     /** World bounding boxes (min, max) of the selected object's instances; a drag starting on them moves it. */
     var selectedBounds: List<Pair<Vec3, Vec3>> = emptyList()
+    /** Only navigate (the sliced preview): touches never select or move objects. */
+    var viewOnly = false
 
     private var lastX = 0f
     private var lastY = 0f
@@ -90,7 +92,7 @@ class PlateView(context: Context) : GLSurfaceView(context) {
                 lastX = event.x; lastY = event.y; downX = event.x; downY = event.y
                 multiTouch = false; moved = false; dragging = false
                 if (mode == InteractionMode.PAINT) listener?.onPaint(event.x, event.y, true)
-                else if (mode == InteractionMode.NAVIGATE && hitsSelection(event.x, event.y)) {
+                else if (mode == InteractionMode.NAVIGATE && !viewOnly && hitsSelection(event.x, event.y)) {
                     dragging = true
                     dragStart = camera.rayOnPlane(event.x, event.y)
                 }
@@ -141,7 +143,7 @@ class PlateView(context: Context) : GLSurfaceView(context) {
                     cancelDrag()
                     if (moved && start != null && end != null) listener?.onMoved(end.x - start.x, end.y - start.y)
                     else if (!moved) listener?.onTap(event.x, event.y)
-                } else if (!moved && !multiTouch && mode != InteractionMode.PAINT) {
+                } else if (!moved && !multiTouch && mode != InteractionMode.PAINT && !viewOnly) {
                     listener?.onTap(event.x, event.y)
                 }
             }
