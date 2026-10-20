@@ -1,5 +1,17 @@
 package app.orcaandroid.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
+import app.orcaandroid.ui.prepare.PrepareSummary
+import app.orcaandroid.ui.preview.PreviewSummary
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -21,8 +33,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.SnackbarHost
@@ -78,6 +88,32 @@ fun AppScaffold(state: UiState, vm: AppViewModel) {
     GlobalDialogs(state, vm)
 }
 
+/** Phone navigation: icons only, the active destination as a labelled pill (lower than NavigationBar). */
+@Composable
+private fun CompactNavigationBar(state: UiState, vm: AppViewModel) {
+    Surface(tonalElevation = 3.dp) {
+        Row(Modifier.fillMaxWidth().navigationBarsPadding().height(56.dp), horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically) {
+            DESTINATIONS.forEach { d ->
+                val selected = state.screen == d.screen
+                val label = stringResource(d.label)
+                Row(
+                    Modifier.clip(RoundedCornerShape(20.dp))
+                        .background(if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent)
+                        .selectable(selected, role = Role.Tab) { vm.setScreen(d.screen) }
+                        .padding(horizontal = if (selected) 14.dp else 18.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Icon(d.icon, if (selected) null else label,
+                        tint = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (selected) Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSecondaryContainer)
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun MainLayout(state: UiState, vm: AppViewModel) {
     BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -108,16 +144,7 @@ private fun MainLayout(state: UiState, vm: AppViewModel) {
         } else {
             Column(Modifier.fillMaxSize()) {
                 content(Modifier.weight(1f).fillMaxWidth())
-                NavigationBar {
-                    DESTINATIONS.forEach { d ->
-                        NavigationBarItem(
-                            selected = state.screen == d.screen,
-                            onClick = { vm.setScreen(d.screen) },
-                            icon = { Icon(d.icon, null) },
-                            label = { Text(stringResource(d.label)) },
-                        )
-                    }
-                }
+                CompactNavigationBar(state, vm)
             }
         }
     }
@@ -138,8 +165,17 @@ private fun Workspace(state: UiState, vm: AppViewModel, wide: Boolean) {
             else PreviewOverlay(state, vm, plateView, wide)
         }
     }
+    // The summary line (what is set up, and slice / print) heads the panel in both layouts.
     val panel: @Composable () -> Unit = {
-        if (state.screen == Screen.PREPARE) PreparePanel(state, vm, wide) else PreviewPanel(state, vm, wide)
+        Column(Modifier.fillMaxSize()) {
+            Box(Modifier.fillMaxWidth().height(68.dp).padding(horizontal = 16.dp), contentAlignment = Alignment.CenterStart) {
+                if (state.screen == Screen.PREPARE) PrepareSummary(state, vm) else PreviewSummary(state, vm)
+            }
+            HorizontalDivider()
+            Box(Modifier.weight(1f)) {
+                if (state.screen == Screen.PREPARE) PreparePanel(state, vm, wide) else PreviewPanel(state, vm, wide)
+            }
+        }
     }
     if (wide) {
         Row(Modifier.fillMaxSize()) {
@@ -147,11 +183,17 @@ private fun Workspace(state: UiState, vm: AppViewModel, wide: Boolean) {
             Surface(Modifier.width(380.dp).fillMaxHeight(), tonalElevation = 1.dp) { panel() }
         }
     } else {
+        // Collapsed, the sheet is one line: what is set up and the main action (slice / print).
+        // Pulled up, it shows the full panel.
         val sheet = rememberBottomSheetScaffoldState()
         BottomSheetScaffold(
             scaffoldState = sheet,
-            sheetPeekHeight = 132.dp,
-            sheetContent = { Box(Modifier.fillMaxWidth().fillMaxHeight(0.75f)) { panel() } },
+            sheetPeekHeight = 84.dp,
+            sheetDragHandle = {
+                Box(Modifier.padding(top = 8.dp, bottom = 4.dp).size(32.dp, 4.dp)
+                    .background(MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(2.dp)))
+            },
+            sheetContent = { Box(Modifier.fillMaxWidth().fillMaxHeight(0.8f)) { panel() } },
         ) { padding ->
             viewport(Modifier.fillMaxSize().padding(bottom = padding.calculateBottomPadding()))
         }

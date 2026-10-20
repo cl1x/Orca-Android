@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -27,17 +26,14 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.ContentCut
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Straighten
 import androidx.compose.material.icons.filled._3dRotation
 import androidx.compose.material.icons.filled.VerticalAlignBottom
 import androidx.compose.material.icons.filled.Videocam
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -57,6 +53,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.material3.Button
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.orcaandroid.R
 import app.orcaandroid.core.VolumeType
@@ -85,27 +84,19 @@ fun PrepareOverlay(state: UiState, vm: AppViewModel, view: PlateView?, wide: Boo
                 }
             }
         }
-        if (wide) {
-            Column(Modifier.align(Alignment.CenterStart).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                ToolButtons(state, vm)
-            }
-        } else {
-            Row(Modifier.align(Alignment.BottomStart).padding(bottom = 64.dp).horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                ToolButtons(state, vm)
-            }
+        // A slim tool bar on the left edge of the view; the slice button is in the panel's summary line.
+        Surface(Modifier.align(Alignment.CenterStart).padding(vertical = 56.dp), shape = RoundedCornerShape(20.dp), tonalElevation = 3.dp) {
+            Column(Modifier.verticalScroll(rememberScrollState()).padding(vertical = 4.dp)) { ToolButtons(state, vm) }
         }
-        Column(Modifier.align(Alignment.BottomStart).padding(start = if (wide) 64.dp else 0.dp, bottom = if (wide) 0.dp else 116.dp)) {
+        Column(Modifier.align(Alignment.BottomStart).padding(start = 52.dp)) {
             ToolPanel(state, vm)
         }
-        SliceButton(state, vm, Modifier.align(Alignment.BottomEnd))
     }
 }
 
 @Composable
 private fun TopBar(state: UiState, vm: AppViewModel, view: PlateView?) {
     var plateMenu by remember { mutableStateOf<Int?>(null) }
-    var viewMenu by remember { mutableStateOf(false) }
     var projectMenu by remember { mutableStateOf(false) }
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -123,26 +114,22 @@ private fun TopBar(state: UiState, vm: AppViewModel, view: PlateView?) {
                     if (plateMenu == plate.index) PlateMenu(state, vm, plate.index) { plateMenu = null }
                 }
             }
-            AssistChip(onClick = vm.scene::addPlate, label = { Text("+") })
         }
-        Surface(shape = RoundedCornerShape(20.dp), tonalElevation = 3.dp) {
-            Row {
-                IconButton(onClick = vm.scene::undo, enabled = state.scene.canUndo) { Icon(Icons.AutoMirrored.Filled.Undo, stringResource(R.string.undo)) }
-                IconButton(onClick = vm.scene::redo, enabled = state.scene.canRedo) { Icon(Icons.AutoMirrored.Filled.Redo, stringResource(R.string.redo)) }
-                Box {
-                    IconButton(onClick = { viewMenu = true }) { Icon(Icons.Default.Videocam, stringResource(R.string.view)) }
-                    DropdownMenu(expanded = viewMenu, onDismissRequest = { viewMenu = false }) {
-                        listOf(R.string.view_iso to 0, R.string.view_top to 1, R.string.view_front to 2, R.string.view_left to 3, R.string.view_right to 4).forEach { (label, id) ->
-                            DropdownMenuItem(text = { Text(stringResource(label)) }, onClick = { viewMenu = false; view?.camera?.preset(id) })
-                        }
-                        DropdownMenuItem(text = { Text(stringResource(R.string.view_fit)) }, onClick = { viewMenu = false; view?.framePlate(state.activePlate) },
-                            leadingIcon = { Icon(Icons.Default.CenterFocusStrong, null) })
-                    }
+        // Undo/redo, plus one menu for the view, plates and the project.
+        IconButton(onClick = vm.scene::undo, enabled = state.scene.canUndo) { Icon(Icons.AutoMirrored.Filled.Undo, stringResource(R.string.undo)) }
+        IconButton(onClick = vm.scene::redo, enabled = state.scene.canRedo) { Icon(Icons.AutoMirrored.Filled.Redo, stringResource(R.string.redo)) }
+        Box {
+            IconButton(onClick = { projectMenu = true }) { Icon(Icons.Default.MoreVert, stringResource(R.string.more)) }
+            ProjectMenu(state, vm, projectMenu, { projectMenu = false }) {
+                listOf(R.string.view_iso to 0, R.string.view_top to 1, R.string.view_front to 2).forEach { (label, id) ->
+                    DropdownMenuItem(text = { Text(stringResource(label)) }, onClick = { projectMenu = false; view?.camera?.preset(id) },
+                        leadingIcon = { Icon(Icons.Default.Videocam, null) })
                 }
-                Box {
-                    IconButton(onClick = { projectMenu = true }) { Icon(Icons.Default.Folder, stringResource(R.string.project)) }
-                    ProjectMenu(state, vm, projectMenu) { projectMenu = false }
-                }
+                DropdownMenuItem(text = { Text(stringResource(R.string.view_fit)) }, onClick = { projectMenu = false; view?.framePlate(state.activePlate) },
+                    leadingIcon = { Icon(Icons.Default.CenterFocusStrong, null) })
+                DropdownMenuItem(text = { Text(stringResource(R.string.add_plate)) }, onClick = { projectMenu = false; vm.scene.addPlate() },
+                    leadingIcon = { Icon(Icons.Default.Add, null) })
+                HorizontalDivider()
             }
         }
     }
@@ -178,7 +165,7 @@ private fun PlateMenu(state: UiState, vm: AppViewModel, plate: Int, onDismiss: (
 }
 
 @Composable
-private fun ProjectMenu(state: UiState, vm: AppViewModel, open: Boolean, onDismiss: () -> Unit) {
+private fun ProjectMenu(state: UiState, vm: AppViewModel, open: Boolean, onDismiss: () -> Unit, extra: @Composable () -> Unit = {}) {
     val openProject = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { it?.let(vm.files::openProject) }
     val saveProject = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("model/3mf")) { it?.let(vm.files::saveProject) }
     val exportStl = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("model/stl")) { it?.let { u -> vm.files.exportStl(u, state.activePlate) } }
@@ -186,6 +173,7 @@ private fun ProjectMenu(state: UiState, vm: AppViewModel, open: Boolean, onDismi
     // Like the desktop: an unsaved project is named after its first object.
     val base = state.projectName ?: state.scene.objects.firstOrNull()?.name?.substringBeforeLast('.') ?: "project"
     DropdownMenu(expanded = open, onDismissRequest = onDismiss) {
+        extra()
         DropdownMenuItem(text = { Text(stringResource(R.string.new_project)) }, onClick = { onDismiss(); if (state.projectDirty) confirmNew = true else vm.files.newProject() })
         DropdownMenuItem(text = { Text(stringResource(R.string.open_project)) }, onClick = { onDismiss(); openProject.launch(arrayOf("*/*")) })
         DropdownMenuItem(text = { Text(stringResource(R.string.save_project)) }, onClick = { onDismiss(); saveProject.launch("$base.3mf") },
@@ -277,39 +265,52 @@ private fun ToolButtons(state: UiState, vm: AppViewModel) {
 
 @Composable
 private fun ToolButton(icon: ImageVector, label: String, active: Boolean = false, enabled: Boolean = true, onClick: () -> Unit) {
+    val colors = androidx.compose.material3.IconButtonDefaults.filledTonalIconButtonColors()
     FilledTonalIconButton(
         onClick = onClick,
         enabled = enabled,
         colors = if (active) androidx.compose.material3.IconButtonDefaults.filledTonalIconButtonColors(
-            containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary) else
-            androidx.compose.material3.IconButtonDefaults.filledTonalIconButtonColors(),
-        modifier = Modifier.size(48.dp),
-    ) { Icon(icon, label) }
+            containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)
+        else colors.copy(containerColor = Color.Transparent, disabledContainerColor = Color.Transparent),
+        modifier = Modifier.size(44.dp),
+    ) { Icon(icon, label, Modifier.size(22.dp)) }
 }
 
+/**
+ * The summary line heading the panel (tablet side panel, phone sheet) on the Prepare screen:
+ * printer, filaments and process, and the slice button (or the progress of a running slice).
+ */
 @Composable
-private fun SliceButton(state: UiState, vm: AppViewModel, modifier: Modifier) {
+fun PrepareSummary(state: UiState, vm: AppViewModel) {
     val running = state.slice as? SliceStatus.Running
-    if (running != null) {
-        Surface(modifier.width(260.dp), shape = RoundedCornerShape(16.dp), tonalElevation = 6.dp) {
-            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("${running.text} · ${running.percent} %", style = MaterialTheme.typography.bodySmall, maxLines = 2)
-                LinearProgressIndicator(progress = { running.percent / 100f }, modifier = Modifier.fillMaxWidth())
-                OutlinedButton(onClick = vm.slicing::cancelSlice, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.cancel)) }
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(Modifier.weight(1f)) {
+            if (running != null) {
+                Text("${running.text} · ${running.percent} %", style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                LinearProgressIndicator(progress = { running.percent / 100f }, modifier = Modifier.fillMaxWidth().padding(top = 6.dp))
+            } else {
+                val filaments = state.filaments.map { it.preset.substringBefore(" @") }
+                val first = filaments.firstOrNull().orEmpty() + if (filaments.size > 1) " +${filaments.size - 1}" else ""
+                Text(listOf(state.printer.orEmpty(), first).filter { it.isNotEmpty() }.joinToString("  ·  "),
+                    style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(state.print.orEmpty().substringBefore(" @"), style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
-    } else {
-        var menu by remember { mutableStateOf(false) }
-        Box(modifier) {
-            ExtendedFloatingActionButton(
-                onClick = { if (!state.scene.isEmpty) vm.slicing.slice() },
-                text = { Text(stringResource(if (state.scene.plates.size > 1) R.string.slice_plate_n else R.string.slice, state.activePlate + 1)) },
-                icon = { Icon(Icons.Default.Layers, null) },
-            )
-            if (state.scene.plates.size > 1) {
-                IconButton(onClick = { menu = true }, modifier = Modifier.align(Alignment.TopEnd).size(24.dp)) { Icon(Icons.Default.ExpandMore, null) }
-                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                    DropdownMenuItem(text = { Text(stringResource(R.string.slice_all)) }, onClick = { menu = false; vm.slicing.sliceAll() })
+        if (running != null) {
+            OutlinedButton(onClick = vm.slicing::cancelSlice) { Text(stringResource(R.string.cancel)) }
+        } else {
+            var menu by remember { mutableStateOf(false) }
+            Box {
+                Button(onClick = { if (!state.scene.isEmpty) vm.slicing.slice() }, enabled = !state.scene.isEmpty) {
+                    Icon(Icons.Default.Layers, null, Modifier.size(18.dp))
+                    Text(" " + stringResource(if (state.scene.plates.size > 1) R.string.slice_plate_n else R.string.slice, state.activePlate + 1))
+                }
+                if (state.scene.plates.size > 1) {
+                    IconButton(onClick = { menu = true }, modifier = Modifier.align(Alignment.TopEnd).size(20.dp)) { Icon(Icons.Default.ExpandMore, null) }
+                    DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                        DropdownMenuItem(text = { Text(stringResource(R.string.slice_all)) }, onClick = { menu = false; vm.slicing.sliceAll() })
+                    }
                 }
             }
         }

@@ -31,7 +31,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -55,6 +54,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.material3.OutlinedIconButton
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import app.orcaandroid.R
@@ -139,29 +139,7 @@ private fun Actions(state: UiState, vm: AppViewModel, r: SliceResult) {
     val saveGcode = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/x.gcode")) { it?.let(vm.files::saveGcode) }
     val save3mf = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("model/3mf")) { it?.let(vm.files::saveGcode3mf) }
     var menu by remember { mutableStateOf(false) }
-    val connection = state.connection
-    val upload = state.upload
-
-    if (connection?.isConfigured == true && connection.type.canUpload) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = { vm.device.upload(true) }, enabled = upload !is UploadState.Running, modifier = Modifier.weight(1f)) {
-                Icon(Icons.Default.PlayArrow, null); Text(stringResource(R.string.print))
-            }
-            FilledTonalButton(onClick = { vm.device.upload(false) }, enabled = upload !is UploadState.Running, modifier = Modifier.weight(1f)) {
-                Icon(Icons.AutoMirrored.Filled.Send, null); Text(stringResource(R.string.send))
-            }
-        }
-    } else {
-        // A "web UI only" connection cannot receive files; say so instead of asking to connect.
-        val label = if (connection?.isConfigured == true) stringResource(R.string.connection_cannot_upload, connection.type.label)
-        else stringResource(R.string.connect_printer)
-        OutlinedButton(onClick = { vm.setScreen(Screen.DEVICE) }, modifier = Modifier.fillMaxWidth()) { Text(label) }
-    }
-    when (upload) {
-        is UploadState.Running -> LinearProgressIndicator(progress = { upload.progress }, modifier = Modifier.fillMaxWidth())
-        is UploadState.Done -> Text(upload.message, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
-        null -> {}
-    }
+    // Print and send are in the summary line (PreviewSummary); here the file actions.
     Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
         OutlinedButton(onClick = { saveGcode.launch(vm.files.gcodeFileName()) }) { Icon(Icons.Default.Save, null); Text(" G-code") }
         IconButton(onClick = {
@@ -303,5 +281,41 @@ private fun readLines(path: String, index: LongArray, first: Int, count: Int): L
         f.seek(start)
         f.readFully(bytes)
         return String(bytes).split('\n').take(count)
+    }
+}
+
+/** The summary line heading the panel in the preview: time and filament, and print / send. */
+@Composable
+fun PreviewSummary(state: UiState, vm: AppViewModel) {
+    val r = state.shownResult
+    val connection = state.connection
+    val upload = state.upload
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(Modifier.weight(1f)) {
+            if (r == null) {
+                Text(stringResource(if (state.scene.isEmpty) R.string.no_objects_hint else R.string.not_sliced),
+                    style = MaterialTheme.typography.bodyMedium, maxLines = 2)
+            } else {
+                Text(formatDuration(r.printTimeSeconds) + "  ·  %.1f g".format(Locale.ROOT, r.filamentGrams),
+                    style = MaterialTheme.typography.titleMedium, maxLines = 1)
+                if (upload is UploadState.Running) LinearProgressIndicator(progress = { upload.progress }, modifier = Modifier.fillMaxWidth().padding(top = 6.dp))
+                else Text((upload as? UploadState.Done)?.message ?: "%.2f m ".format(Locale.ROOT, r.filamentMm / 1000) + stringResource(R.string.filament),
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+            }
+        }
+        when {
+            r == null -> if (!state.scene.isEmpty) Button(onClick = { vm.slicing.slice(state.previewPlate) }, enabled = !state.isSlicing) {
+                Text(stringResource(R.string.slice))
+            }
+            connection?.isConfigured == true && connection.type.canUpload -> {
+                OutlinedIconButton(onClick = { vm.device.upload(false) }, enabled = upload !is UploadState.Running) {
+                    Icon(Icons.AutoMirrored.Filled.Send, stringResource(R.string.send))
+                }
+                Button(onClick = { vm.device.upload(true) }, enabled = upload !is UploadState.Running) {
+                    Icon(Icons.Default.PlayArrow, null, Modifier.size(18.dp)); Text(" " + stringResource(R.string.print))
+                }
+            }
+            else -> OutlinedButton(onClick = { vm.setScreen(Screen.DEVICE) }) { Text(stringResource(R.string.connect)) }
+        }
     }
 }

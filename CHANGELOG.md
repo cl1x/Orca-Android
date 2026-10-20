@@ -3,6 +3,15 @@
 > Orca-Android was developed with an AI coding assistant (Claude, Anthropic); see the
 > [AI disclosure](README.md#ai-disclosure) in the README.
 
+## Unreleased
+
+- The preview only navigates: touching an object there no longer moves it and drops the slice.
+- Slimmer layout, the same on phones and tablets: one top bar (plate, undo/redo, a menu for the
+  view, plates and the project), a slim tool bar on the left edge of the view, and a summary line
+  at the top of the panel with the main action (slice, or print and send). In the preview the
+  layer slider runs along the right edge and the move slider along the bottom, without a card.
+  On phones the collapsed sheet is just that summary line and the navigation bar is lower.
+
 ## 0.1.7
 
 - Favourites are grouped like the settings (e.g. "Supports", "Seam"), in the settings' order.
