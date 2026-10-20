@@ -145,7 +145,10 @@ The first run builds all native dependencies (about an hour); outputs go to
 
 Signed release builds: create a keystore and `android/key.properties` (`storeFile`,
 `storePassword`, `keyAlias`, `keyPassword`; never commit either of them), then run
-`scripts/build_release.sh`. It writes the APK to `dist/`.
+`scripts/build_release.sh`. It writes the APK to `dist/`. With `--publish` it also creates the
+GitHub release for the tag `v<version>` on the current commit, with the version's CHANGELOG
+section as notes (needs the [GitHub CLI](https://cli.github.com), logged in with `gh auth login`;
+the repository is set by `ORCA_GITHUB_REPO`).
 
 Tests (on a connected device or an arm64-capable emulator):
 
