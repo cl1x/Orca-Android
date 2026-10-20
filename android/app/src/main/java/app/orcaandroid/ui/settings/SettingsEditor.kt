@@ -25,10 +25,14 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -52,6 +56,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -218,6 +223,8 @@ private fun EditorFrame(
     var query by remember(type) { mutableStateOf("") }
     var searching by remember { mutableStateOf(false) }
     var pageIndex by rememberSaveable(type) { mutableIntStateOf(0) }
+    // Groups start collapsed; the ones the user opens stay open (per page) while the editor is shown.
+    val expanded = remember(type) { mutableStateMapOf<String, Boolean>() }
     // Per-object editors start with only what the object overrides; "all" shows every option.
     var onlyModified by remember { mutableStateOf(objectMode && source.modifiedCount > 0) }
 
@@ -252,7 +259,12 @@ private fun EditorFrame(
             }
             HorizontalDivider()
 
-            fun visible(def: OptionDef) = def.mode <= mode || (mode == 2 && def.mode == 3)
+            // Starred options of this preset type form a first page, independent of the mode.
+            val favKeys = state.favorites.filter { it.startsWith("${type.id}:") }.map { it.substringAfter(':') }.filter { it in defs }
+            val favTitle = stringResource(R.string.favorites)
+            val shownPages = if (favKeys.isEmpty()) pages else listOf(SettingsPage(favTitle, listOf(SettingsGroup("", favKeys)))) + pages
+            val onFavPage = favKeys.isNotEmpty() && pageIndex == 0
+            fun visible(def: OptionDef) = onFavPage || def.mode <= mode || (mode == 2 && def.mode == 3)
             val hidden = state.optionStates.hidden
             val groups: List<SettingsGroup> = when {
                 query.isNotBlank() -> {
@@ -273,19 +285,19 @@ private fun EditorFrame(
                         if (hits.isEmpty()) null else SettingsGroup("${tr.tr(page.title)} › ${tr.tr(g.title)}", hits)
                     }
                 }
-                else -> pages.getOrNull(pageIndex)?.groups.orEmpty()
+                else -> shownPages.getOrNull(pageIndex)?.groups.orEmpty()
             }
             val showPages = query.isBlank() && !onlyModified
 
-            if (!wide && showPages && pages.isNotEmpty()) {
-                PrimaryScrollableTabRow(selectedTabIndex = pageIndex.coerceIn(0, pages.lastIndex), edgePadding = 8.dp) {
-                    pages.forEachIndexed { i, p -> Tab(i == pageIndex, { pageIndex = i }, text = { Text(tr.tr(p.title)) }) }
+            if (!wide && showPages && shownPages.isNotEmpty()) {
+                PrimaryScrollableTabRow(selectedTabIndex = pageIndex.coerceIn(0, shownPages.lastIndex), edgePadding = 8.dp) {
+                    shownPages.forEachIndexed { i, p -> Tab(i == pageIndex, { pageIndex = i }, text = { Text(tr.tr(p.title)) }) }
                 }
             }
             Row(Modifier.fillMaxSize()) {
                 if (wide && showPages) {
                     LazyColumn(Modifier.width(220.dp).fillMaxHeight().padding(vertical = 8.dp)) {
-                        itemsIndexed(pages) { i, page ->
+                        itemsIndexed(shownPages) { i, page ->
                             val selected = i == pageIndex
                             Text(
                                 tr.tr(page.title),
@@ -304,14 +316,28 @@ private fun EditorFrame(
                             (query.isNotBlank() || onlyModified || visible(it)) && it.key !in hidden && source.value(it.key) != null
                         }
                         if (options.isEmpty()) return@forEachIndexed
-                        item(key = "g:$gi:${group.title}") {
-                            Text(if (showPages) tr.tr(group.title) else group.title, style = MaterialTheme.typography.titleSmall,
-                                color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 16.dp, bottom = 4.dp))
+                        // Search hits and the "only changed" list are shown open, or they would be hidden.
+                        val groupId = "$pageIndex:${group.title}"
+                        val open = group.title.isEmpty() || !showPages || expanded[groupId] == true
+                        if (group.title.isNotEmpty()) item(key = "g:$gi:${group.title}") {
+                            Row(
+                                Modifier.fillMaxWidth().clickable(enabled = showPages) { expanded[groupId] = !open }.padding(top = 12.dp, bottom = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(if (showPages) tr.tr(group.title) else group.title, Modifier.weight(1f), style = MaterialTheme.typography.titleSmall,
+                                    color = MaterialTheme.colorScheme.primary)
+                                val changed = options.count { source.isModified(it.key) }
+                                if (changed > 0 && !open) Text(stringResource(R.string.n_modified, changed), style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.tertiary, modifier = Modifier.padding(end = 8.dp))
+                                if (showPages) Icon(if (open) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                    stringResource(if (open) R.string.collapse else R.string.expand), tint = MaterialTheme.colorScheme.primary)
+                            }
                             HorizontalDivider()
                         }
-                        items(options, key = { "o:$gi:${it.key}" }) { def ->
+                        if (open) items(options, key = { "o:$gi:${it.key}" }) { def ->
                             OptionRow(def, source.value(def.key).orEmpty(), source.isModified(def.key), def.key !in state.optionStates.disabled,
-                                wide, tr, { source.set(def.key, it) }, { source.reset(def.key) })
+                                wide, tr, { source.set(def.key, it) }, { source.reset(def.key) },
+                                favorite = "${type.id}:${def.key}" in state.favorites, onFavorite = { vm.presets.toggleFavorite(type, def.key) })
                         }
                     }
                     item { Spacer(Modifier.heightIn(min = 48.dp)) }
@@ -337,7 +363,7 @@ private fun buildPages(layout: List<SettingsPage>, defs: Map<String, OptionDef>)
 private fun suggestUserName(base: String): String = base.substringBefore(" @").trim().ifEmpty { base } + " - Custom"
 
 @Composable
-private fun OptionRow(
+internal fun OptionRow(
     def: OptionDef,
     value: String,
     modified: Boolean,
@@ -346,6 +372,8 @@ private fun OptionRow(
     tr: Translator,
     onChange: (String) -> Unit,
     onReset: () -> Unit,
+    favorite: Boolean = false,
+    onFavorite: (() -> Unit)? = null,
 ) {
     var showTooltip by remember { mutableStateOf(false) }
     val label: @Composable (Modifier) -> Unit = { m ->
@@ -359,6 +387,11 @@ private fun OptionRow(
     val trailing: @Composable () -> Unit = {
         if (wide) IconButton(onClick = { showTooltip = true }, enabled = def.tooltip.isNotEmpty()) { Icon(Icons.Default.Info, stringResource(R.string.info)) }
         IconButton(onClick = onReset, enabled = modified) { Icon(Icons.Default.Refresh, stringResource(R.string.reset)) }
+        if (onFavorite != null) IconButton(onClick = onFavorite) {
+            Icon(if (favorite) Icons.Default.Star else Icons.Default.StarBorder,
+                stringResource(if (favorite) R.string.remove_favorite else R.string.add_favorite),
+                tint = if (favorite) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.outline)
+        }
     }
     if (wide) {
         Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -386,7 +419,7 @@ private fun OptionRow(
 }
 
 @Composable
-private fun OptionEditor(def: OptionDef, value: String, enabled: Boolean, tr: Translator, onChange: (String) -> Unit) {
+internal fun OptionEditor(def: OptionDef, value: String, enabled: Boolean, tr: Translator, onChange: (String) -> Unit) {
     // Vector options with several distinct entries (e.g. per-extruder values) are edited as raw text.
     val single = !def.isVector || !value.contains(',')
     when {
@@ -399,7 +432,7 @@ private fun OptionEditor(def: OptionDef, value: String, enabled: Boolean, tr: Tr
 }
 
 @Composable
-private fun EnumEditor(def: OptionDef, value: String, enabled: Boolean, tr: Translator, onChange: (String) -> Unit) {
+internal fun EnumEditor(def: OptionDef, value: String, enabled: Boolean, tr: Translator, onChange: (String) -> Unit) {
     var open by remember { mutableStateOf(false) }
     val index = def.enumValues.indexOf(value)
     val label = if (index >= 0) tr.tr(def.enumLabels.getOrElse(index) { value }) else value

@@ -36,8 +36,8 @@ android {
         applicationId = "de.cl1x.orca_android"
         minSdk = 29
         targetSdk = 36
-        versionCode = 6
-        versionName = "0.1.5"
+        versionCode = 7
+        versionName = "0.1.6"
         // The native core is only built for arm64.
         ndk { abiFilters += "arm64-v8a" }
         buildConfigField("String", "ORCA_VERSION", "\"$orcaVersion\"")

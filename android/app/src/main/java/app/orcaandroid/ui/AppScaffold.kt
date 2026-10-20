@@ -172,6 +172,27 @@ private fun GlobalDialogs(state: UiState, vm: AppViewModel) {
             },
         )
     }
+    state.projectSettingsPrompt?.let { p ->
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text(stringResource(R.string.project_settings_title)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(stringResource(R.string.project_settings_text))
+                    @Composable fun change(label: Int, c: Pair<String, String>?) = c?.let {
+                        Text(stringResource(label), style = MaterialTheme.typography.labelLarge)
+                        Text("${it.first.ifEmpty { "–" }}  →  ${it.second}", style = MaterialTheme.typography.bodySmall)
+                    }
+                    change(R.string.printer, p.printerChange)
+                    change(R.string.process, p.printChange)
+                    change(R.string.filaments, p.filamentChange)
+                    if (p.changedSettings > 0) Text(stringResource(R.string.project_settings_changed, p.changedSettings), style = MaterialTheme.typography.bodySmall)
+                }
+            },
+            confirmButton = { TextButton(onClick = vm.files::useProjectSettings) { Text(stringResource(R.string.use_project_settings)) } },
+            dismissButton = { TextButton(onClick = vm.files::keepCurrentSettings) { Text(stringResource(R.string.keep_current_settings)) } },
+        )
+    }
     state.error?.let { message ->
         AlertDialog(
             onDismissRequest = vm::dismissError,

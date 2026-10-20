@@ -32,6 +32,11 @@ class AppSettings(context: Context) {
         get() = prefs.getStringSet("hidden_filament_vendors", emptySet()).orEmpty()
         set(value) = prefs.edit().putStringSet("hidden_filament_vendors", value).apply()
 
+    /** Favourite options as "type:key" (e.g. "print:layer_height"), in the order they were added. */
+    var favoriteOptions: List<String>
+        get() = prefs.getString("favorite_options", null)?.split('\n')?.filter { it.isNotBlank() } ?: DEFAULT_FAVORITES
+        set(value) = prefs.edit().putString("favorite_options", value.joinToString("\n")).apply()
+
     var lastPrinter: String?
         get() = prefs.getString("printer", null)
         set(value) = prefs.edit().putString("printer", value).apply()
@@ -75,5 +80,10 @@ class AppSettings(context: Context) {
 
     fun addRecent(file: RecentFile) {
         recents = (listOf(file) + recents.filter { it.uri != file.uri }).take(12)
+    }
+
+    companion object {
+        /** The options the print panel showed before favourites existed. */
+        val DEFAULT_FAVORITES = listOf("print:layer_height", "print:sparse_infill_density", "print:wall_loops", "print:enable_support", "print:brim_type")
     }
 }

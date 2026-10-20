@@ -3,6 +3,16 @@
 > Orca-Android was developed with an AI coding assistant (Claude, Anthropic); see the
 > [AI disclosure](README.md#ai-disclosure) in the README.
 
+## 0.1.6
+
+- Opening a project whose printer, process, filaments or setting changes differ from the current
+  ones asks whether to use the project's settings or keep the current ones.
+- Favourite settings: star any option in the settings editor. Favourites form the first page of
+  the editor and replace the fixed quick settings in the print panel (by default the same five
+  options as before).
+- Setting groups in the editor are collapsible and start collapsed; a collapsed group shows how
+  many of its options are changed.
+
 ## 0.1.5
 
 - The camera in the printer's web UI (Fluidd, Mainsail) works: the web view computed the CSS

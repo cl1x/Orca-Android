@@ -7,6 +7,7 @@ import app.orcaandroid.core.OptionStates
 import app.orcaandroid.core.PresetType
 import app.orcaandroid.core.PrinterInfo
 import app.orcaandroid.core.PrinterSetup
+import app.orcaandroid.core.ProjectInfo
 import app.orcaandroid.core.RecentFile
 import app.orcaandroid.core.ResourceStore
 import app.orcaandroid.core.Scene
@@ -96,6 +97,8 @@ data class UiState(
     val overrides: Map<PresetType, Map<String, String>> = emptyMap(),
     val optionStates: OptionStates = OptionStates(),
     val hiddenFilamentVendors: Set<String> = emptySet(),
+    /** Favourite options as "type:key", shown first in the settings and in the print panel. */
+    val favorites: List<String> = emptyList(),
     val editor: EditorTarget? = null,
     val showPrinterSetup: Boolean = false,
 
@@ -107,6 +110,8 @@ data class UiState(
     val measure: List<Vec3> = emptyList(),
     val layerProfile: LayerProfile? = null,
     val calibration: Calibration? = null,
+    /** A loaded project whose presets differ from the current ones: the user picks which to use. */
+    val projectSettingsPrompt: ProjectSettingsPrompt? = null,
     val projectName: String? = null,
     /** Unsaved changes since the project was opened/saved. */
     val projectDirty: Boolean = false,
@@ -165,3 +170,12 @@ data class UiState(
 
     val selectedPrinterKeys get() = printers.filter { it.name == printer }.map { printerKey(it.model, it.nozzle) }
 }
+
+/** What a just-opened project would change, shown in the "project or current settings" dialog. */
+data class ProjectSettingsPrompt(
+    val info: ProjectInfo,
+    val printerChange: Pair<String, String>?,
+    val printChange: Pair<String, String>?,
+    val filamentChange: Pair<String, String>?,
+    val changedSettings: Int,
+)

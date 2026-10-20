@@ -38,6 +38,16 @@ class PresetController(private val store: Store, private val device: DeviceContr
         store.update { it.copy(phase = Phase.READY) }
     }
 
+    fun isFavorite(type: PresetType, key: String) = "${type.id}:$key" in store.value.favorites
+
+    /** Adds or removes an option from the favourites (settings editor star, print panel). */
+    fun toggleFavorite(type: PresetType, key: String) {
+        val id = "${type.id}:$key"
+        val list = store.value.favorites.let { if (id in it) it - id else it + id }
+        settings.favoriteOptions = list
+        store.update { it.copy(favorites = list) }
+    }
+
     fun setHiddenFilamentVendors(vendors: Set<String>) {
         settings.hiddenFilamentVendors = vendors
         store.update { it.copy(hiddenFilamentVendors = vendors) }

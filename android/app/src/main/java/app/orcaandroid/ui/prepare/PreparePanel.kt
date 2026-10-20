@@ -4,6 +4,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -34,6 +36,7 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -47,6 +50,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.orcaandroid.R
 import app.orcaandroid.core.LayerRange
+import app.orcaandroid.ui.settings.OptionRow
+import app.orcaandroid.ui.settings.EnumEditor
+import app.orcaandroid.core.OptionDef
 import app.orcaandroid.core.overrides
 import app.orcaandroid.core.PresetType
 import app.orcaandroid.core.Vec3
@@ -130,27 +136,69 @@ private fun PresetsTab(state: UiState, vm: AppViewModel) {
     QuickSettings(state, vm)
 }
 
-/** The handful of process options people change all the time, one tap away. */
+/** The favourite options (starred in the settings editor), one tap away. */
 @Composable
 private fun QuickSettings(state: UiState, vm: AppViewModel) {
-    val t = PresetType.PRINT
-    fun num(key: String) = state.value(t, key)?.removeSuffix("%")?.toFloatOrNull()
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        num("layer_height")?.let { v ->
-            NumberField(v, { vm.presets.setOption(t, "layer_height", it.toString()) }, Modifier.weight(1f), vm.translator.tr("Layer height"), "mm", 2)
-        }
-        num("sparse_infill_density")?.let { v ->
-            NumberField(v, { vm.presets.setOption(t, "sparse_infill_density", "${it.toInt()}%") }, Modifier.weight(1f), vm.translator.tr("Sparse infill density"), "%", 0)
-        }
-        num("wall_loops")?.let { v ->
-            NumberField(v, { vm.presets.setOption(t, "wall_loops", it.toInt().toString()) }, Modifier.weight(1f), vm.translator.tr("Wall loops"), null, 0)
+    val tr = vm.translator
+    val favorites = state.favorites.mapNotNull { id ->
+        PresetType.entries.firstOrNull { it.id == id.substringBefore(':') }?.let { it to id.substringAfter(':') }
+    }
+    val types = favorites.map { it.first }.toSet()
+    var defs by remember { mutableStateOf<Map<String, OptionDef>>(emptyMap()) }
+    LaunchedEffect(types) {
+        defs = types.flatMap { t -> runCatching { vm.presets.optionDefs(t) }.getOrDefault(emptyList()).map { "${t.id}:${it.key}" to it } }.toMap()
+    }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(stringResource(R.string.favorites), Modifier.weight(1f), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+        TextButton(onClick = { vm.presets.openEditor(EditorTarget.Preset(PresetType.PRINT)) }) { Text(stringResource(R.string.edit_favorites)) }
+    }
+    if (favorites.isEmpty()) {
+        Text(stringResource(R.string.favorites_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        return
+    }
+    class Fav(val type: PresetType, val def: OptionDef, val value: String) {
+        val enabled get() = type != PresetType.PRINT || def.key !in state.optionStates.disabled
+        val single get() = !def.isVector || !value.contains(',')
+        val numeric get() = single && def.enumValues.isEmpty() && def.baseType in setOf("int", "float", "percent") && value.removeSuffix("%").toFloatOrNull() != null
+        fun set(v: String) = vm.presets.setOption(type, def.key, v)
+    }
+    val items = favorites.mapNotNull { (t, k) -> defs["${t.id}:$k"]?.let { d -> state.value(t, k)?.let { Fav(t, d, it) } } }
+        .filter { it.type != PresetType.PRINT || it.def.key !in state.optionStates.hidden }
+    fun label(d: OptionDef) = tr.tr(d.label.ifEmpty { d.fullLabel.ifEmpty { d.key } })
+
+    // Numbers compact, three per row; switches, choices and everything else below.
+    items.filter { it.numeric }.chunked(3).forEach { row ->
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            row.forEach { f ->
+                val d = f.def
+                val decimals = if (d.baseType == "float") 3 else if (d.baseType == "percent") 1 else 0
+                val suffix = if (d.baseType == "percent") "%" else tr.tr(d.sidetext).takeIf { it.isNotEmpty() && !it.startsWith("%") }
+                NumberField(f.value.removeSuffix("%").toFloat(), { v ->
+                    f.set(when (d.baseType) {
+                        "int" -> v.toInt().toString()
+                        "percent" -> plain(v) + "%"
+                        else -> plain(v)
+                    })
+                }, Modifier.weight(1f), label(d), suffix, decimals)
+            }
+            repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
         }
     }
-    SwitchRow(vm.translator.tr("Enable support"), state.value(t, "enable_support") == "1") { vm.presets.setOption(t, "enable_support", if (it) "1" else "0") }
-    state.value(t, "brim_type")?.let { brim ->
-        SwitchRow(vm.translator.tr("Brim"), brim != "no_brim") { vm.presets.setOption(t, "brim_type", if (it) "auto_brim" else "no_brim") }
+    items.filterNot { it.numeric }.forEach { f ->
+        val d = f.def
+        when {
+            d.baseType == "bool" && f.single -> SwitchRow(label(d), f.value == "1", f.enabled) { f.set(if (it) "1" else "0") }
+            d.enumValues.isNotEmpty() && f.single -> Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(label(d), Modifier.weight(1f).padding(end = 8.dp), style = MaterialTheme.typography.bodyMedium)
+                Box(Modifier.weight(1f)) { EnumEditor(d, f.value, f.enabled, tr) { f.set(it) } }
+            }
+            else -> OptionRow(d, f.value, state.isModified(f.type, d.key), f.enabled, false, tr, { f.set(it) }, { vm.presets.resetOption(f.type, d.key) })
+        }
     }
 }
+
+/** A number without trailing zeros, as the settings store it ("0.12", "15"). */
+private fun plain(v: Float): String = java.math.BigDecimal(v.toString()).stripTrailingZeros().toPlainString()
 
 @Composable
 internal fun SwitchRow(label: String, checked: Boolean, enabled: Boolean = true, onChange: (Boolean) -> Unit) {

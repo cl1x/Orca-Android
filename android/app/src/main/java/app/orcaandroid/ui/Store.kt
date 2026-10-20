@@ -26,6 +26,7 @@ class Store(val app: Application, val scope: CoroutineScope) {
             themeMode = settings.themeMode,
             dynamicColor = settings.dynamicColor,
             hiddenFilamentVendors = settings.hiddenFilamentVendors,
+            favorites = settings.favoriteOptions,
             recents = settings.recents,
         )
     )
