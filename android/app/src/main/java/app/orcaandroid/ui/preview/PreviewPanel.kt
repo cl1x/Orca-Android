@@ -114,12 +114,12 @@ fun PreviewPanel(state: UiState, vm: AppViewModel, wide: Boolean) {
 
 @Composable
 private fun Summary(state: UiState, vm: AppViewModel, r: SliceResult) {
+    if (r.cost <= 0 && r.filamentUse.size <= 1 && r.warnings.isEmpty()) return
     Card(shape = RoundedCornerShape(12.dp)) {
+        // Time and filament total are in the summary line, the layer count next to the layer slider;
+        // the card holds the details.
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(formatDuration(r.printTimeSeconds), style = MaterialTheme.typography.headlineSmall)
-            LabeledValue(stringResource(R.string.filament), "%.2f m · %.1f g".format(Locale.ROOT, r.filamentMm / 1000, r.filamentGrams))
             if (r.cost > 0) LabeledValue(stringResource(R.string.cost), "%.2f".format(Locale.ROOT, r.cost))
-            LabeledValue(stringResource(R.string.layers), r.layers.size.toString())
             if (r.filamentUse.size > 1) {
                 r.filamentUse.forEachIndexed { i, (m, g) ->
                     if (m > 0f) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {

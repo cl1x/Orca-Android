@@ -274,6 +274,12 @@
     <string name="remove_group_favorites">Gruppe aus Favoriten entfernen</string>
     <string name="add_plate">Platte hinzufügen</string>
     <string name="connect">Verbinden</string>
+    <string name="plate_sliced">Gesliced – Ergebnis in der Vorschau</string>
+    <string name="plate_not_sliced">Noch nicht gesliced</string>
+    <plurals name="n_objects">
+        <item quantity="one">%d Objekt</item>
+        <item quantity="other">%d Objekte</item>
+    </plurals>
     <string name="status_failed">Kein Status: %1$s</string>
     <string name="web_ui_only_short">Nur Weboberfläche – für Status und Drucken den Druckertyp in den Verbindungseinstellungen wählen</string>
     <string name="connection_cannot_upload">„%1$s“ kann keine Drucke empfangen – Verbindung ändern</string>

@@ -11,6 +11,9 @@
   at the top of the panel with the main action (slice, or print and send). In the preview the
   layer slider runs along the right edge and the move slider along the bottom, without a card.
   On phones the collapsed sheet is just that summary line and the navigation bar is lower.
+- No information shown twice: the summary line in Prepare shows the plate's state (objects,
+  sliced or not) instead of repeating printer and presets, and the preview's details card leaves
+  out time, filament total and layer count, which are shown in the summary line and at the slider.
 
 ## 0.1.7
 

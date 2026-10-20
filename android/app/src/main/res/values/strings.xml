@@ -275,6 +275,12 @@
     <string name="remove_group_favorites">Remove group from favorites</string>
     <string name="add_plate">Add plate</string>
     <string name="connect">Connect</string>
+    <string name="plate_sliced">Sliced – the result is in the preview</string>
+    <string name="plate_not_sliced">Not sliced yet</string>
+    <plurals name="n_objects">
+        <item quantity="one">%d object</item>
+        <item quantity="other">%d objects</item>
+    </plurals>
     <string name="status_failed">No status: %1$s</string>
     <string name="web_ui_only_short">Web UI only – choose the printer type in the connection settings for status and printing</string>
     <string name="connection_cannot_upload">“%1$s” cannot receive prints – change the connection</string>

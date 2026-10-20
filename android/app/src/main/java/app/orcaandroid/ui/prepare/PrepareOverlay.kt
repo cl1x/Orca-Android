@@ -52,6 +52,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.material3.Button
 import androidx.compose.ui.graphics.Color
@@ -277,8 +278,8 @@ private fun ToolButton(icon: ImageVector, label: String, active: Boolean = false
 }
 
 /**
- * The summary line heading the panel (tablet side panel, phone sheet) on the Prepare screen:
- * printer, filaments and process, and the slice button (or the progress of a running slice).
+ * The summary line heading the panel (tablet side panel, phone sheet) on the Prepare screen: the
+ * active plate's state and the slice button (or the progress of a running slice).
  */
 @Composable
 fun PrepareSummary(state: UiState, vm: AppViewModel) {
@@ -289,12 +290,13 @@ fun PrepareSummary(state: UiState, vm: AppViewModel) {
                 Text("${running.text} · ${running.percent} %", style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 LinearProgressIndicator(progress = { running.percent / 100f }, modifier = Modifier.fillMaxWidth().padding(top = 6.dp))
             } else {
-                val filaments = state.filaments.map { it.preset.substringBefore(" @") }
-                val first = filaments.firstOrNull().orEmpty() + if (filaments.size > 1) " +${filaments.size - 1}" else ""
-                Text(listOf(state.printer.orEmpty(), first).filter { it.isNotEmpty() }.joinToString("  ·  "),
+                // The plate's state; printer and presets are shown by the panel below, not repeated here.
+                val plate = state.activePlate
+                val objects = state.scene.objectsOn(plate).size
+                Text(stringResource(R.string.plate_n, plate + 1) + "  ·  " + pluralStringResource(R.plurals.n_objects, objects, objects),
                     style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(state.print.orEmpty().substringBefore(" @"), style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(stringResource(if (state.results.containsKey(plate)) R.string.plate_sliced else R.string.plate_not_sliced),
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
             }
         }
         if (running != null) {
