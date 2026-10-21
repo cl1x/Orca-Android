@@ -8,6 +8,15 @@
 - Favourites are grouped by settings page (Quality, Strength, Support, …) instead of one heading
   per option: in the print panel each page is a card that can be collapsed (showing how many
   options it holds or how many are changed), and number fields of a page share a row.
+- Faster start: the workspace opens as soon as the profiles are loaded; the last session's models
+  follow in the background ("Restoring last session…" over the view).
+- Opening a project with other settings asks in a banner above the view instead of a dialog, so the
+  project's models stay visible while choosing.
+- Print panel without repeated labels: the printer and process fields no longer repeat their
+  section title, "Choose printers" moved into the printer list, and all preset edit buttons use
+  the same icon.
+- Unit tests for app logic (favourites, picker lists, profile update hashes); the release script
+  runs them before every build, and with `--device-tests` also the engine tests on the device.
 
 ## 0.1.8
 

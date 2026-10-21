@@ -56,13 +56,22 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             store.update { it.copy(phase = Phase.SETUP) }
         } else {
             presets.reloadPresets(emptySet())
-            runCatching { files.restoreSession() }.onFailure { android.util.Log.w("Orca", "session not restored", it) }
-            store.update { it.copy(phase = Phase.READY) }
+            // The workspace is usable at once; the last session's models follow in the background.
+            store.update { it.copy(phase = Phase.READY, restoringSession = files.hasSession()) }
+            if (store.value.restoringSession) store.launch {
+                try {
+                    files.restoreSession()
+                } catch (e: Exception) {
+                    android.util.Log.w("Orca", "session not restored", e)
+                } finally {
+                    store.update { it.copy(restoringSession = false) }
+                }
+            }
         }
     }
 
-    /** Waits until startup has finished (intents that arrive while the app starts). */
-    suspend fun awaitReady() = state.first { it.phase == Phase.READY }
+    /** Waits until startup has finished, including the session (intents that arrive while the app starts). */
+    suspend fun awaitReady() = state.first { it.phase == Phase.READY && !it.restoringSession }
 
     // --- App-wide UI state ---------------------------------------------------------------------------
 

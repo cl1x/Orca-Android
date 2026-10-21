@@ -122,6 +122,7 @@
     <string name="loading">Loading…</string>
     <string name="loading_model">Loading model…</string>
     <string name="loading_profiles">Loading profiles…</string>
+    <string name="restoring_session">Restoring last session…</string>
     <string name="manage_printers">Choose printers</string>
     <string name="measure">Measure</string>
     <string name="measure_hint_first">Tap the first point.</string>
@@ -260,7 +261,7 @@
     <string name="state_printing">Printing</string>
     <string name="status_unknown">Waiting for status…</string>
     <string name="project_settings_title">Project settings</string>
-    <string name="project_settings_text">The project was saved with other settings. Use them, or keep the current ones? The objects and plates are loaded either way.</string>
+    <string name="project_settings_text">The project was saved with other settings. Its objects are loaded either way.</string>
     <string name="project_settings_changed">%d changed settings in the project</string>
     <string name="use_project_settings">Use project settings</string>
     <string name="keep_current_settings">Keep current</string>

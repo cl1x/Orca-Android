@@ -40,6 +40,18 @@ import java.util.Locale
 /** An entry in a [PickerField]; [group] is shown as a section header (e.g. the vendor). */
 data class PickerItem(val id: String, val label: String = id, val group: String = "")
 
+/**
+ * The items of a picker matching every word of [query] (in label or group), grouped so each group
+ * gets one heading even when [items] interleave groups (groups in first-seen order), without
+ * duplicates (a duplicate would crash the list, whose keys must be unique).
+ */
+internal fun pickerEntries(items: List<PickerItem>, query: String): List<PickerItem> {
+    val words = query.trim().lowercase().split(' ').filter { it.isNotEmpty() }
+    return items.filter { item -> words.all { w -> item.label.lowercase().contains(w) || item.group.lowercase().contains(w) } }
+        .groupBy { it.group }.values.flatten()
+        .distinctBy { it.group to it.id }
+}
+
 /** A compact labelled field that opens a searchable single-choice dialog. */
 @Composable
 fun PickerField(
@@ -50,12 +62,16 @@ fun PickerField(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     modified: Boolean = false,
+    caption: String? = label,
+    extraAction: Pair<String, () -> Unit>? = null,
 ) {
     var open by remember { mutableStateOf(false) }
     OutlinedCard(modifier = modifier.fillMaxWidth().clickable(enabled = enabled && items.isNotEmpty()) { open = true }) {
         Column(Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
-            Text(
-                if (modified) "$label · ${stringResource(R.string.modified)}" else label,
+            // Without a caption (a section title already names the field) only "modified" is shown.
+            val text = listOfNotNull(caption, if (modified) stringResource(R.string.modified) else null).joinToString(" · ")
+            if (text.isNotEmpty()) Text(
+                text,
                 style = MaterialTheme.typography.labelSmall,
                 color = if (modified) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
             )
@@ -67,19 +83,21 @@ fun PickerField(
             )
         }
     }
-    if (open) PickerDialog(label, selected, items, onDismiss = { open = false }) { open = false; onSelect(it) }
+    if (open) PickerDialog(label, selected, items, onDismiss = { open = false },
+        extraAction = extraAction?.let { (text, action) -> text to { open = false; action() } }) { open = false; onSelect(it) }
 }
 
 @Composable
-fun PickerDialog(title: String, selected: String?, items: List<PickerItem>, onDismiss: () -> Unit, onPick: (String) -> Unit) {
+fun PickerDialog(
+    title: String,
+    selected: String?,
+    items: List<PickerItem>,
+    onDismiss: () -> Unit,
+    extraAction: Pair<String, () -> Unit>? = null,
+    onPick: (String) -> Unit,
+) {
     var query by remember { mutableStateOf("") }
-    val filtered = remember(query, items) {
-        val words = query.trim().lowercase().split(' ').filter { it.isNotEmpty() }
-        items.filter { item -> words.all { w -> item.label.lowercase().contains(w) || item.group.lowercase().contains(w) } }
-            // One heading per group, even when the source list interleaves groups (kept in first-seen order).
-            .groupBy { it.group }.values.flatten()
-            .distinctBy { it.group to it.id }
-    }
+    val filtered = remember(query, items) { pickerEntries(items, query) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
@@ -116,7 +134,7 @@ fun PickerDialog(title: String, selected: String?, items: List<PickerItem>, onDi
                 }
             }
         },
-        confirmButton = {},
+        confirmButton = { extraAction?.let { (text, action) -> TextButton(onClick = action) { Text(text) } } },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
     )
 }

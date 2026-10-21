@@ -139,6 +139,8 @@ data class UiState(
     val profileUpdates: List<ResourceStore.ProfileUpdate>? = null,
     /** Progress text while profile updates install in the background; null when idle. */
     val profileUpdateProgress: String? = null,
+    /** The last session is being loaded in the background after the start. */
+    val restoringSession: Boolean = false,
 ) {
     fun presetName(type: PresetType) = when (type) {
         PresetType.PRINT -> print

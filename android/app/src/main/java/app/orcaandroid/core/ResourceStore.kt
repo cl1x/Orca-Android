@@ -199,13 +199,7 @@ class ResourceStore(private val context: Context) {
         const val API = "https://api.github.com/repos/$REPO"
         const val PARALLEL_DOWNLOADS = 8
 
-        /** The hash git (and GitHub's tree listing) uses for a file's content. */
-        fun gitBlobSha(file: File): String {
-            val bytes = file.readBytes()
-            val sha = MessageDigest.getInstance("SHA-1")
-            sha.update("blob ${bytes.size}\u0000".toByteArray())
-            return sha.digest(bytes).joinToString("") { "%02x".format(it) }
-        }
+        fun gitBlobSha(file: File): String = gitBlobSha(file.readBytes())
 
         fun enc(s: String) = Uri.encode(s)
 
@@ -246,4 +240,11 @@ class ResourceStore(private val context: Context) {
             return 0
         }
     }
+}
+
+/** The hash git (and GitHub's tree listing) uses for a file's content. */
+internal fun gitBlobSha(bytes: ByteArray): String {
+    val sha = MessageDigest.getInstance("SHA-1")
+    sha.update("blob ${bytes.size}\u0000".toByteArray())
+    return sha.digest(bytes).joinToString("") { "%02x".format(it) }
 }

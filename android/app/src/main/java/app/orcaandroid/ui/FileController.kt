@@ -117,7 +117,8 @@ class FileController(
     /** Saves the scene, presets and setting changes as a project (called when the app goes to the background). */
     suspend fun saveSession() {
         val s = store.value
-        if (s.phase != Phase.READY) return
+        // While the session is still loading, the saved one is the latest state.
+        if (s.phase != Phase.READY || s.restoringSession) return
         // A calibration test cannot be resumed from a project; an empty plate needs no session.
         if (s.scene.isEmpty || s.calibration != null) {
             sessionProject.delete(); sessionInfo.delete()
@@ -135,6 +136,8 @@ class FileController(
             }.toString())
         }
     }
+
+    fun hasSession() = sessionProject.exists() && store.value.scene.isEmpty
 
     /** Restores the last session if the engine has no scene (a fresh start of the process). */
     suspend fun restoreSession() {

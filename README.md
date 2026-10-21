@@ -113,7 +113,9 @@ What is tested: an instrumented test suite
 ([EngineTest.kt](android/app/src/androidTest/java/app/orcaandroid/EngineTest.kt)) slices on a real
 Android runtime with printers of five vendors, every sparse and surface infill pattern, walls,
 seams, supports, brims, ironing, vase mode, multi-material, custom G-code, all calibration tests,
-projects and presets. The app was tried on an Android tablet and in the Android emulator, connected
+projects and presets. Unit tests
+([AppLogicTest.kt](android/app/src/test/java/app/orcaandroid/AppLogicTest.kt)) cover app logic
+that needs no device, such as the grouping of favourites and the profile update checks. The app was tried on an Android tablet and in the Android emulator, connected
 to a Klipper printer (Qidi Q1 Pro).
 What is not tested: Bambu Lab LAN printing (no printer available), and many printer/profile
 combinations.
@@ -145,14 +147,17 @@ The first run builds all native dependencies (about an hour); outputs go to
 
 Signed release builds: create a keystore and `android/key.properties` (`storeFile`,
 `storePassword`, `keyAlias`, `keyPassword`; never commit either of them), then run
-`scripts/build_release.sh`. It writes the APK to `dist/`. With `--publish` it also creates the
+`scripts/build_release.sh`. It runs the unit tests first (with `--device-tests` also the engine
+tests on the connected device) and writes the APK to `dist/`. With `--publish` it also creates the
 GitHub release for the tag `v<version>` on the current commit, with the version's CHANGELOG
 section as notes (needs the [GitHub CLI](https://cli.github.com), logged in with `gh auth login`;
 the repository is set by `ORCA_GITHUB_REPO`).
 
-Tests (on a connected device or an arm64-capable emulator):
+Tests: unit tests on the build machine, engine tests on a connected device or an arm64-capable
+emulator (Gradle uninstalls the debug app afterwards):
 
 ```bash
+cd android && ./gradlew testDebugUnitTest
 cd android && ./gradlew connectedDebugAndroidTest
 ```
 

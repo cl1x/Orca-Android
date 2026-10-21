@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Layers
 import androidx.compose.material.icons.outlined.MoreHoriz
@@ -37,6 +38,7 @@ import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -52,6 +54,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.orcaandroid.R
 import app.orcaandroid.render.PlateView
@@ -163,6 +166,16 @@ private fun Workspace(state: UiState, vm: AppViewModel, wide: Boolean) {
             Viewport(state, vm, onView = { plateView = it }, modifier = Modifier.fillMaxSize())
             if (state.screen == Screen.PREPARE) PrepareOverlay(state, vm, plateView, wide)
             else PreviewOverlay(state, vm, plateView, wide)
+            state.projectSettingsPrompt?.let { p ->
+                ProjectSettingsBanner(p, vm, Modifier.align(Alignment.TopCenter).padding(top = 56.dp, start = 60.dp, end = 12.dp))
+            }
+            if (state.restoringSession) Surface(Modifier.align(Alignment.Center), shape = MaterialTheme.shapes.large,
+                color = MaterialTheme.colorScheme.surfaceContainer, tonalElevation = 2.dp) {
+                Column(Modifier.padding(horizontal = 20.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(stringResource(R.string.restoring_session), style = MaterialTheme.typography.bodyMedium)
+                    LinearProgressIndicator(Modifier.width(200.dp))
+                }
+            }
         }
     }
     // The summary line (what is set up, and slice / print) heads the panel in both layouts.
@@ -200,6 +213,34 @@ private fun Workspace(state: UiState, vm: AppViewModel, wide: Boolean) {
     }
 }
 
+/**
+ * Asks whether a loaded project's settings replace the current ones. A banner over the view, not a
+ * dialog, so the project's models stay visible while deciding.
+ */
+@Composable
+private fun ProjectSettingsBanner(p: ProjectSettingsPrompt, vm: AppViewModel, modifier: Modifier) {
+    Surface(modifier.widthIn(max = 560.dp), shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        tonalElevation = 3.dp, shadowElevation = 3.dp) {
+        Column(Modifier.padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(stringResource(R.string.project_settings_title), style = MaterialTheme.typography.titleSmall)
+            Text(stringResource(R.string.project_settings_text), style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(end = 8.dp))
+            @Composable fun change(label: Int, c: Pair<String, String>?) = c?.let {
+                Text("${stringResource(label)}: ${it.first.ifEmpty { "–" }}  →  ${it.second}", style = MaterialTheme.typography.bodySmall,
+                    maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(end = 8.dp))
+            }
+            change(R.string.printer, p.printerChange)
+            change(R.string.process, p.printChange)
+            change(R.string.filaments, p.filamentChange)
+            if (p.changedSettings > 0) Text(stringResource(R.string.project_settings_changed, p.changedSettings), style = MaterialTheme.typography.bodySmall)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = vm.files::keepCurrentSettings) { Text(stringResource(R.string.keep_current_settings)) }
+                TextButton(onClick = vm.files::useProjectSettings) { Text(stringResource(R.string.use_project_settings)) }
+            }
+        }
+    }
+}
+
 @Composable
 private fun GlobalDialogs(state: UiState, vm: AppViewModel) {
     if (state.busy != null && state.phase != Phase.LOADING) {
@@ -212,27 +253,6 @@ private fun GlobalDialogs(state: UiState, vm: AppViewModel) {
                     Text(state.busy)
                 }
             },
-        )
-    }
-    state.projectSettingsPrompt?.let { p ->
-        AlertDialog(
-            onDismissRequest = {},
-            title = { Text(stringResource(R.string.project_settings_title)) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(stringResource(R.string.project_settings_text))
-                    @Composable fun change(label: Int, c: Pair<String, String>?) = c?.let {
-                        Text(stringResource(label), style = MaterialTheme.typography.labelLarge)
-                        Text("${it.first.ifEmpty { "–" }}  →  ${it.second}", style = MaterialTheme.typography.bodySmall)
-                    }
-                    change(R.string.printer, p.printerChange)
-                    change(R.string.process, p.printChange)
-                    change(R.string.filaments, p.filamentChange)
-                    if (p.changedSettings > 0) Text(stringResource(R.string.project_settings_changed, p.changedSettings), style = MaterialTheme.typography.bodySmall)
-                }
-            },
-            confirmButton = { TextButton(onClick = vm.files::useProjectSettings) { Text(stringResource(R.string.use_project_settings)) } },
-            dismissButton = { TextButton(onClick = vm.files::keepCurrentSettings) { Text(stringResource(R.string.keep_current_settings)) } },
         )
     }
     state.error?.let { message ->

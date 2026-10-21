@@ -18,7 +18,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Tune
@@ -98,10 +97,10 @@ private fun PresetsTab(state: UiState, vm: AppViewModel) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         PickerField(stringResource(R.string.printer), state.printer,
             state.visiblePrinters.map { PickerItem(it.name, it.name, if (it.system) it.vendor else vm.translator.tr("User presets")) },
-            vm.presets::selectPrinter, Modifier.weight(1f), modified = state.overrides[PresetType.PRINTER].orEmpty().isNotEmpty())
-        IconButton(onClick = { vm.presets.openEditor(EditorTarget.Preset(PresetType.PRINTER)) }) { Icon(Icons.Default.Edit, stringResource(R.string.edit)) }
+            vm.presets::selectPrinter, Modifier.weight(1f), modified = state.overrides[PresetType.PRINTER].orEmpty().isNotEmpty(),
+            caption = null, extraAction = stringResource(R.string.manage_printers) to vm.presets::openPrinterSetup)
+        IconButton(onClick = { vm.presets.openEditor(EditorTarget.Preset(PresetType.PRINTER)) }) { Icon(Icons.Default.Tune, stringResource(R.string.edit)) }
     }
-    TextButton(onClick = vm.presets::openPrinterSetup) { Text(stringResource(R.string.manage_printers)) }
     if (state.supportsBedTypes) {
         val plate = state.scene.plates.getOrNull(state.activePlate)
         PickerField(stringResource(R.string.plate_type), plate?.bedType?.ifEmpty { null } ?: setup?.defaultBedType,
@@ -118,7 +117,7 @@ private fun PresetsTab(state: UiState, vm: AppViewModel) {
                 filaments.map { PickerItem(it.name, it.name, if (it.system) it.vendor.ifEmpty { "Generic" } else vm.translator.tr("User presets")) },
                 { vm.presets.setFilament(i, it) }, Modifier.weight(1f), modified = slot.overrides.isNotEmpty())
             IconButton(onClick = { vm.presets.setActiveFilament(i); vm.presets.openEditor(EditorTarget.Preset(PresetType.FILAMENT)) }) {
-                Icon(Icons.Default.Edit, stringResource(R.string.edit))
+                Icon(Icons.Default.Tune, stringResource(R.string.edit))
             }
             if (state.filaments.size > 1) IconButton(onClick = { vm.presets.removeFilament(i) }) { Icon(Icons.Default.Delete, stringResource(R.string.delete)) }
         }
@@ -134,7 +133,7 @@ private fun PresetsTab(state: UiState, vm: AppViewModel) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         PickerField(stringResource(R.string.process), state.print,
             setup?.prints.orEmpty().map { PickerItem(it.name, it.name, if (it.system) "System" else vm.translator.tr("User presets")) },
-            vm.presets::selectPrint, Modifier.weight(1f), modified = state.overrides[PresetType.PRINT].orEmpty().isNotEmpty())
+            vm.presets::selectPrint, Modifier.weight(1f), modified = state.overrides[PresetType.PRINT].orEmpty().isNotEmpty(), caption = null)
         IconButton(onClick = { vm.presets.openEditor(EditorTarget.Preset(PresetType.PRINT)) }) { Icon(Icons.Default.Tune, stringResource(R.string.edit)) }
     }
     QuickSettings(state, vm)
@@ -193,12 +192,7 @@ private fun QuickSettings(state: UiState, vm: AppViewModel) {
             if (open) Column(Modifier.padding(start = 12.dp, end = 12.dp, bottom = 10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 // In the settings' order; consecutive numbers share a row (up to three), so a switch stays
                 // above the options that depend on it.
-                val rows = mutableListOf<List<QuickOption>>()
-                for (f in items) {
-                    val last = rows.lastOrNull()
-                    if (f.numeric && last != null && last.all { it.numeric } && last.size < 3) rows[rows.lastIndex] = last + f else rows += listOf(f)
-                }
-                rows.forEach { row ->
+                packRows(items, { it.numeric }).forEach { row ->
                     val f = row.first()
                     val d = f.def
                     when {
@@ -236,8 +230,18 @@ private class QuickOption(val type: PresetType, val def: OptionDef, val value: S
     val numeric get() = single && def.enumValues.isEmpty() && def.baseType in setOf("int", "float", "percent") && value.removeSuffix("%").toFloatOrNull() != null
 }
 
+/** Rows of [items] in order: consecutive [numeric] items share a row (up to [perRow]), others get their own. */
+internal fun <T> packRows(items: List<T>, numeric: (T) -> Boolean, perRow: Int = 3): List<List<T>> {
+    val rows = mutableListOf<List<T>>()
+    for (f in items) {
+        val last = rows.lastOrNull()
+        if (numeric(f) && last != null && last.all(numeric) && last.size < perRow) rows[rows.lastIndex] = last + f else rows += listOf(f)
+    }
+    return rows
+}
+
 /** A number without trailing zeros, as the settings store it ("0.12", "15"). */
-private fun plain(v: Float): String = java.math.BigDecimal(v.toString()).stripTrailingZeros().toPlainString()
+internal fun plain(v: Float): String = java.math.BigDecimal(v.toString()).stripTrailingZeros().toPlainString()
 
 @Composable
 internal fun SwitchRow(label: String, checked: Boolean, enabled: Boolean = true, onChange: (Boolean) -> Unit) {
