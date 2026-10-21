@@ -19,6 +19,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -139,7 +141,8 @@ private fun PresetsTab(state: UiState, vm: AppViewModel) {
 }
 
 /**
- * The favourite options (starred in the settings editor), one tap away, grouped like the settings.
+ * The favourite options (starred in the settings editor), one tap away, as a collapsible card per
+ * settings page.
  * Options the desktop rules grey out for the current values are left out here, so dependent
  * settings (e.g. the support type) appear once their parent option is switched on.
  */
@@ -165,6 +168,8 @@ private fun QuickSettings(state: UiState, vm: AppViewModel) {
         Text(stringResource(R.string.favorites_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         return
     }
+    // Collapsed favourite groups; all open at first.
+    var collapsed by rememberSaveable { mutableStateOf(listOf<String>()) }
     fun label(d: OptionDef) = tr.tr(d.label.ifEmpty { d.fullLabel.ifEmpty { d.key } })
     val typeName = mapOf(PresetType.FILAMENT to stringResource(R.string.filament), PresetType.PRINTER to stringResource(R.string.printer))
 
@@ -172,41 +177,54 @@ private fun QuickSettings(state: UiState, vm: AppViewModel) {
         val items = group.options.mapNotNull { k -> typeDefs[k]?.let { d -> state.value(type, k)?.let { QuickOption(type, d, it) } } }
             .filter { type != PresetType.PRINT || (it.def.key !in state.optionStates.hidden && it.def.key !in state.optionStates.disabled) }
         if (items.isEmpty()) continue
-        val title = group.title.substringAfterLast(" › ")
-        Text(typeName[type]?.let { "$it · $title" } ?: title, style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
-        // In the settings' order; consecutive numbers share a row (up to three), so a switch stays
-        // above the options that depend on it.
-        val rows = mutableListOf<List<QuickOption>>()
-        for (f in items) {
-            val last = rows.lastOrNull()
-            if (f.numeric && last != null && last.all { it.numeric } && last.size < 3) rows[rows.lastIndex] = last + f else rows += listOf(f)
-        }
-        rows.forEach { row ->
-            val f = row.first()
-            val d = f.def
-            when {
-                f.numeric -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    row.forEach { n ->
-                        val nd = n.def
-                        val decimals = if (nd.baseType == "float") 3 else if (nd.baseType == "percent") 1 else 0
-                        val suffix = if (nd.baseType == "percent") "%" else tr.tr(nd.sidetext).takeIf { it.isNotEmpty() && !it.startsWith("%") }
-                        NumberField(n.value.removeSuffix("%").toFloat(), { v ->
-                            vm.presets.setOption(n.type, nd.key, when (nd.baseType) {
-                                "int" -> v.toInt().toString()
-                                "percent" -> plain(v) + "%"
-                                else -> plain(v)
-                            })
-                        }, Modifier.weight(1f), label(nd), suffix, decimals)
+        val id = "${type.id}:${group.title}"
+        val open = id !in collapsed
+        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
+            Row(Modifier.fillMaxWidth().clickable { collapsed = if (open) collapsed + id else collapsed - id }.padding(start = 12.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
+                verticalAlignment = Alignment.CenterVertically) {
+                Text(typeName[type]?.let { "$it · ${group.title}" } ?: group.title, Modifier.weight(1f), style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.primary)
+                val changed = items.count { state.isModified(it.type, it.def.key) }
+                if (!open) Text(if (changed > 0) stringResource(R.string.n_modified, changed) else items.size.toString(), style = MaterialTheme.typography.labelSmall,
+                    color = if (changed > 0) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(end = 8.dp))
+                Icon(if (open) Icons.Default.ExpandLess else Icons.Default.ExpandMore, stringResource(if (open) R.string.collapse else R.string.expand),
+                    tint = MaterialTheme.colorScheme.primary)
+            }
+            if (open) Column(Modifier.padding(start = 12.dp, end = 12.dp, bottom = 10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                // In the settings' order; consecutive numbers share a row (up to three), so a switch stays
+                // above the options that depend on it.
+                val rows = mutableListOf<List<QuickOption>>()
+                for (f in items) {
+                    val last = rows.lastOrNull()
+                    if (f.numeric && last != null && last.all { it.numeric } && last.size < 3) rows[rows.lastIndex] = last + f else rows += listOf(f)
+                }
+                rows.forEach { row ->
+                    val f = row.first()
+                    val d = f.def
+                    when {
+                        f.numeric -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            row.forEach { n ->
+                                val nd = n.def
+                                val decimals = if (nd.baseType == "float") 3 else if (nd.baseType == "percent") 1 else 0
+                                val suffix = if (nd.baseType == "percent") "%" else tr.tr(nd.sidetext).takeIf { it.isNotEmpty() && !it.startsWith("%") }
+                                NumberField(n.value.removeSuffix("%").toFloat(), { v ->
+                                    vm.presets.setOption(n.type, nd.key, when (nd.baseType) {
+                                        "int" -> v.toInt().toString()
+                                        "percent" -> plain(v) + "%"
+                                        else -> plain(v)
+                                    })
+                                }, Modifier.weight(1f), label(nd), suffix, decimals)
+                            }
+                            repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
+                        }
+                        d.baseType == "bool" && f.single -> SwitchRow(label(d), f.value == "1") { vm.presets.setOption(f.type, d.key, if (it) "1" else "0") }
+                        d.enumValues.isNotEmpty() && f.single -> Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(label(d), Modifier.weight(1f).padding(end = 8.dp), style = MaterialTheme.typography.bodyMedium)
+                            Box(Modifier.weight(1f)) { EnumEditor(d, f.value, true, tr) { vm.presets.setOption(f.type, d.key, it) } }
+                        }
+                        else -> OptionRow(d, f.value, state.isModified(f.type, d.key), true, false, tr, { vm.presets.setOption(f.type, d.key, it) }, { vm.presets.resetOption(f.type, d.key) })
                     }
-                    repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
                 }
-                d.baseType == "bool" && f.single -> SwitchRow(label(d), f.value == "1") { vm.presets.setOption(f.type, d.key, if (it) "1" else "0") }
-                d.enumValues.isNotEmpty() && f.single -> Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(label(d), Modifier.weight(1f).padding(end = 8.dp), style = MaterialTheme.typography.bodyMedium)
-                    Box(Modifier.weight(1f)) { EnumEditor(d, f.value, true, tr) { vm.presets.setOption(f.type, d.key, it) } }
-                }
-                else -> OptionRow(d, f.value, state.isModified(f.type, d.key), true, false, tr, { vm.presets.setOption(f.type, d.key, it) }, { vm.presets.resetOption(f.type, d.key) })
             }
         }
     }

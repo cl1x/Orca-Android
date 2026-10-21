@@ -359,18 +359,17 @@ private fun EditorFrame(
 }
 
 /**
- * The favourite options of [type], grouped like the settings pages ("Quality › Seam"), in the
- * pages' order. Favourites that no page places are left out.
+ * The favourite options of [type], one group per settings page ("Quality", "Strength", …) in the
+ * settings' order. The pages' own groups mostly hold one favourite each, which would show a
+ * heading per option. Favourites that no page places are left out.
  */
 internal fun favoriteGroups(favorites: List<String>, type: PresetType, pages: List<SettingsPage>, tr: Translator): List<SettingsGroup> {
     val keys = favorites.filter { it.startsWith("${type.id}:") }.map { it.substringAfter(':') }.toSet()
     if (keys.isEmpty()) return emptyList()
     val placed = mutableSetOf<String>()
-    return pages.flatMap { page ->
-        page.groups.mapNotNull { g ->
-            val hits = g.options.filter { it in keys && placed.add(it) }
-            if (hits.isEmpty()) null else SettingsGroup("${tr.tr(page.title)} › ${tr.tr(g.title)}", hits)
-        }
+    return pages.mapNotNull { page ->
+        val hits = page.groups.flatMap { g -> g.options.filter { it in keys && placed.add(it) } }
+        if (hits.isEmpty()) null else SettingsGroup(tr.tr(page.title), hits)
     }
 }
 
