@@ -3,7 +3,7 @@
 > Orca-Android was developed with an AI coding assistant (Claude, Anthropic); see the
 > [AI disclosure](README.md#ai-disclosure) in the README.
 
-## Unreleased
+## 0.1.9
 
 - Favourites are grouped by settings page (Quality, Strength, Support, …) instead of one heading
   per option: in the print panel each page is a card that can be collapsed (showing how many
